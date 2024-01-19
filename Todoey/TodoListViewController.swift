@@ -47,7 +47,22 @@ class TodoListViewController: UITableViewController {
         tableView.deselectRow(at: indexPath, animated: true)
     }
     
-
-
+    
+    @IBAction func barButtonPressed(_ sender: UIBarButtonItem) {
+        let alert = UIAlertController(title: "Add New Todoey Item", message: "", preferredStyle: .alert)
+        
+        let action = UIAlertAction(title: "Add Item", style: .default) { action in
+            //ユーザーがUIAlertActionをタップしたときに実行されるコード
+            print("Success!")
+        }
+        alert.addTextField { alertTextField in
+            alertTextField.placeholder = "Create new item"
+            print(alertTextField.text)
+        }
+        
+        alert.addAction(action)
+        present(alert, animated: true, completion: nil)
+    }
+    
 }
 
