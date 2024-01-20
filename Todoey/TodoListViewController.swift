@@ -10,7 +10,7 @@ import UIKit
 
 class TodoListViewController: UITableViewController {
     
-    let itemArray = ["参考書を買う", "支払いをする", "更新する"]
+    var itemArray = ["参考書を買う", "支払いをする", "更新する"]
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -48,19 +48,27 @@ class TodoListViewController: UITableViewController {
     }
     
     
-    @IBAction func barButtonPressed(_ sender: UIBarButtonItem) {
+    //MARK: - Add New Items
+    
+    @IBAction func addButtonPressed(_ sender: UIBarButtonItem) {
+        
+        var textField = UITextField()
+        
         let alert = UIAlertController(title: "Add New Todoey Item", message: "", preferredStyle: .alert)
         
         let action = UIAlertAction(title: "Add Item", style: .default) { action in
             //ユーザーがUIAlertActionをタップしたときに実行されるコード
-            print("Success!")
+            self.itemArray.append(textField.text!)
+            self.tableView.reloadData()
         }
+        
         alert.addTextField { alertTextField in
             alertTextField.placeholder = "Create new item"
-            print(alertTextField.text)
+            textField = alertTextField
         }
         
         alert.addAction(action)
+        
         present(alert, animated: true, completion: nil)
     }
     
