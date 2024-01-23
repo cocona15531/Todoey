@@ -10,15 +10,27 @@ import UIKit
 
 class TodoListViewController: UITableViewController {
     
-    var itemArray = ["参考書を買う", "支払いをする", "更新する"]
+    var itemArray = [Item]()
     
     let defaults = UserDefaults.standard
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        
+        let newItem = Item()
+        newItem.title = "課題を提出する"
+        itemArray.append(newItem)
+        
+        let newItem2 = Item()
+        newItem.title = "水を買う"
+        itemArray.append(newItem2)
+        
+        let newItem3 = Item()
+        newItem.title = "ジムに行く"
+        itemArray.append(newItem3)
 
-        if let items = defaults.array(forKey: "TodoListArray") as? [String] {
-            itemArray = items
+//        if let items = defaults.array(forKey: "TodoListArray") as? [String] {
+//            itemArray = items
         }
     }
 
