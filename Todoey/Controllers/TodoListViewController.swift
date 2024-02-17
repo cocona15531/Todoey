@@ -19,15 +19,17 @@ class TodoListViewController: UITableViewController {
         
         let newItem = Item()
         newItem.title = "課題を提出する"
+        newItem.done = false
         itemArray.append(newItem)
         
         let newItem2 = Item()
-        newItem.title = "水を買う"
+        newItem2.title = "水を買う"
         itemArray.append(newItem2)
         
         let newItem3 = Item()
-        newItem.title = "ジムに行く"
+        newItem3.title = "ジムに行く"
         itemArray.append(newItem3)
+
 
 //        if let items = defaults.array(forKey: "TodoListArray") as? [String] {
 //            itemArray = items
@@ -44,21 +46,26 @@ class TodoListViewController: UITableViewController {
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         
         let cell = tableView.dequeueReusableCell(withIdentifier: "ToDoItemCell", for: indexPath)
-        cell.textLabel?.text = itemArray[indexPath.row].title
+        
+        let item = itemArray[indexPath.row]
+        
+        cell.textLabel?.text = item.title
+        
+        if item.done == true {
+            cell.accessoryType = .checkmark
+        } else {
+            cell.accessoryType = .none
+        }
+        
         return cell
     }
     
-    
-    //MARK: - TableView Delegate Methods
-    
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         //print(itemArray[indexPath.row])
-                
-        if tableView.cellForRow(at: indexPath)?.accessoryType == .checkmark {
-            tableView.cellForRow(at: indexPath)?.accessoryType = .none
-        } else {
-            tableView.cellForRow(at: indexPath)?.accessoryType = .checkmark
-        }
+        
+        itemArray[indexPath.row].done = !itemArray[indexPath.row].done
+        
+        tableView.reloadData()
         
         tableView.deselectRow(at: indexPath, animated: true)
     }
