@@ -19,7 +19,6 @@ class TodoListViewController: UITableViewController {
         
         let newItem = Item()
         newItem.title = "課題を提出する"
-        newItem.done = false
         itemArray.append(newItem)
         
         let newItem2 = Item()
@@ -30,10 +29,9 @@ class TodoListViewController: UITableViewController {
         newItem3.title = "ジムに行く"
         itemArray.append(newItem3)
 
-
-//        if let items = defaults.array(forKey: "TodoListArray") as? [String] {
-//            itemArray = items
-//        }
+        if let items = defaults.array(forKey: "TodoListArray") as? [Item] {
+            itemArray = items
+        }
     }
 
 
