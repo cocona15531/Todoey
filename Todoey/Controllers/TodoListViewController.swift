@@ -18,17 +18,7 @@ class TodoListViewController: UITableViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        let newItem = Item()
-        newItem.title = "課題を提出する"
-        itemArray.append(newItem)
-        
-        let newItem2 = Item()
-        newItem2.title = "水を買う"
-        itemArray.append(newItem2)
-        
-        let newItem3 = Item()
-        newItem3.title = "ジムに行く"
-        itemArray.append(newItem3)
+        loadItem()
     }
     
     
@@ -108,6 +98,17 @@ class TodoListViewController: UITableViewController {
         }
         
         self.tableView.reloadData()
+    }
+    
+    func loadItem() {
+        if let data = try? Data(contentsOf: dataFilePath!) {
+            let decoder = PropertyListDecoder()
+            do {
+                itemArray = try decoder.decode([Item].self, from: data)
+            } catch {
+                print("エラーが発生しました。\(error)")
+            }
+        }
     }
     
 }
