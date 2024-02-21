@@ -52,8 +52,8 @@ class TodoListViewController: UITableViewController {
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         //print(itemArray[indexPath.row])
         
-//        context.delete(itemArray[indexPath.row])
-//        itemArray.remove(at: indexPath.row)
+        //        context.delete(itemArray[indexPath.row])
+        //        itemArray.remove(at: indexPath.row)
         
         itemArray[indexPath.row].done = !itemArray[indexPath.row].done
         
@@ -102,7 +102,7 @@ class TodoListViewController: UITableViewController {
         do {
             try context.save()
         } catch {
-            print("エラーが発生しました。\(error)")
+            print("\(error)")
         }
         
         self.tableView.reloadData()
@@ -122,11 +122,12 @@ class TodoListViewController: UITableViewController {
 //MARK: - Search bar methods
 
 extension TodoListViewController: UISearchBarDelegate {
-     
+    
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
         let request: NSFetchRequest<Item> = Item.fetchRequest()
         
-        print(searchBar.text!)
+        let predicate = NSPredicate(format: "title CONTAINS %@[cd]", searchBar.text!)
+        
+        request.predicate = predicate
     }
 }
-
