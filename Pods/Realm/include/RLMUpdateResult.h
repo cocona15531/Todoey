@@ -16,15 +16,13 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#import <Realm/RLMConstants.h>
+#import <Foundation/Foundation.h>
 
-RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
+NS_ASSUME_NONNULL_BEGIN
 
 @class RLMObjectId;
-@protocol RLMBSON;
 
 /// The result of an `updateOne` or `updateMany` operation a `RLMMongoCollection`.
-RLM_SWIFT_SENDABLE RLM_FINAL // immutable final class
 @interface RLMUpdateResult : NSObject
 
 /// The number of documents that matched the filter.
@@ -33,13 +31,9 @@ RLM_SWIFT_SENDABLE RLM_FINAL // immutable final class
 /// The number of documents modified.
 @property (nonatomic, readonly) NSUInteger modifiedCount;
 
-/// The identifier of the inserted document if an upsert took place and the document's primary key is an `ObjectId`.
-@property (nonatomic, nullable, readonly) RLMObjectId *objectId
-__attribute__((deprecated("Use documentId instead, which support all BSON types", "documentId")));
-
 /// The identifier of the inserted document if an upsert took place.
-@property (nonatomic, nullable, readonly) id<RLMBSON> documentId;
+@property (nonatomic, nullable, readonly) RLMObjectId *objectId;
 
 @end
 
-RLM_HEADER_AUDIT_END(nullability, sendability)
+NS_ASSUME_NONNULL_END

@@ -20,7 +20,6 @@
 #define REALM_OBJECT_STORE_HPP
 
 #include <realm/object-store/property.hpp>
-#include <realm/exceptions.hpp>
 
 #include <realm/table_ref.hpp>
 #include <realm/util/optional.hpp>
@@ -85,7 +84,7 @@ public:
     // NOTE: must be performed within a write transaction
     static void apply_schema_changes(Transaction& group, uint64_t schema_version, Schema& target_schema,
                                      uint64_t target_schema_version, SchemaMode mode,
-                                     std::vector<SchemaChange> const& changes, bool handle_automatically_backlinks,
+                                     std::vector<SchemaChange> const& changes,
                                      std::function<void()> migration_function = {});
 
     static void apply_additive_changes(Group&, std::vector<SchemaChange> const&, bool update_indexes);
@@ -116,9 +115,9 @@ private:
     friend class ObjectSchema;
 };
 
-class InvalidSchemaVersionException : public LogicError {
+class InvalidSchemaVersionException : public std::logic_error {
 public:
-    InvalidSchemaVersionException(uint64_t old_version, uint64_t new_version, bool must_exactly_equal);
+    InvalidSchemaVersionException(uint64_t old_version, uint64_t new_version);
     uint64_t old_version() const
     {
         return m_old_version;
@@ -133,36 +132,35 @@ private:
 };
 
 // Schema validation exceptions
-struct ObjectSchemaValidationException {
+struct ObjectSchemaValidationException : public std::logic_error {
     ObjectSchemaValidationException(std::string message)
-        : m_message(std::move(message))
+        : logic_error(std::move(message))
     {
     }
 
     template <typename... Args>
     ObjectSchemaValidationException(const char* fmt, Args&&... args)
-        : m_message(util::format(fmt, std::forward<Args>(args)...))
+        : std::logic_error(util::format(fmt, std::forward<Args>(args)...))
     {
     }
-    std::string m_message;
 };
 
-struct SchemaValidationException : public LogicError {
+struct SchemaValidationException : public std::logic_error {
     SchemaValidationException(std::vector<ObjectSchemaValidationException> const& errors);
 };
 
-struct SchemaMismatchException : public LogicError {
+struct SchemaMismatchException : public std::logic_error {
     SchemaMismatchException(std::vector<ObjectSchemaValidationException> const& errors);
 };
 
-struct InvalidAdditiveSchemaChangeException : public LogicError {
+struct InvalidAdditiveSchemaChangeException : public std::logic_error {
     InvalidAdditiveSchemaChangeException(std::vector<ObjectSchemaValidationException> const& errors);
 };
-struct InvalidReadOnlySchemaChangeException : public LogicError {
+struct InvalidReadOnlySchemaChangeException : public std::logic_error {
     InvalidReadOnlySchemaChangeException(std::vector<ObjectSchemaValidationException> const& errors);
 };
 
-struct InvalidExternalSchemaChangeException : public LogicError {
+struct InvalidExternalSchemaChangeException : public std::logic_error {
     InvalidExternalSchemaChangeException(std::vector<ObjectSchemaValidationException> const& errors);
 };
 } // namespace realm

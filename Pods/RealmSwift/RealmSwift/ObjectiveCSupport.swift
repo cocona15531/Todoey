@@ -91,9 +91,13 @@ import Realm
     }
 
     /// Convert a `Migration` to a `RLMMigration`.
-    @available(*, deprecated, message: "This function is now redundant")
     public static func convert(object: Migration) -> RLMMigration {
-        return object
+        return object.rlmMigration
+    }
+
+    /// Convert a `RLMMigration` to a `Migration`.
+    public static func convert(object: RLMMigration) -> Migration {
+        return Migration(object)
     }
 
     /// Convert a `ObjectSchema` to a `RLMObjectSchema`.
@@ -147,24 +151,21 @@ import Realm
     }
 
     /// Convert a `RLMShouldCompactOnLaunchBlock` to a Realm Swift compact block.
-    @preconcurrency
-    public static func convert(object: @escaping RLMShouldCompactOnLaunchBlock) -> @Sendable (Int, Int) -> Bool {
+    public static func convert(object: @escaping RLMShouldCompactOnLaunchBlock) -> (Int, Int) -> Bool {
         return { totalBytes, usedBytes in
             return object(UInt(totalBytes), UInt(usedBytes))
         }
     }
 
     /// Convert a Realm Swift compact block to a `RLMShouldCompactOnLaunchBlock`.
-    @preconcurrency
-    public static func convert(object: @Sendable @escaping (Int, Int) -> Bool) -> RLMShouldCompactOnLaunchBlock {
+    public static func convert(object: @escaping (Int, Int) -> Bool) -> RLMShouldCompactOnLaunchBlock {
         return { totalBytes, usedBytes in
             return object(Int(totalBytes), Int(usedBytes))
         }
     }
 
     /// Convert a RealmSwift before block to an RLMClientResetBeforeBlock
-    @preconcurrency
-    public static func convert(object: (@Sendable (Realm) -> Void)?) -> RLMClientResetBeforeBlock? {
+    public static func convert(object: ((Realm) -> Void)?) -> RLMClientResetBeforeBlock? {
         guard let object = object else {
             return nil
         }
@@ -174,8 +175,7 @@ import Realm
     }
 
     /// Convert an RLMClientResetBeforeBlock to a RealmSwift before  block
-    @preconcurrency
-    public static func convert(object: RLMClientResetBeforeBlock?) -> (@Sendable (Realm) -> Void)? {
+    public static func convert(object: RLMClientResetBeforeBlock?) -> ((Realm) -> Void)? {
         guard let object = object else {
             return nil
         }
@@ -185,8 +185,7 @@ import Realm
     }
 
     /// Convert a RealmSwift after block to an RLMClientResetAfterBlock
-    @preconcurrency
-    public static func convert(object: (@Sendable (Realm, Realm) -> Void)?) -> RLMClientResetAfterBlock? {
+    public static func convert(object: ((Realm, Realm) -> Void)?) -> RLMClientResetAfterBlock? {
         guard let object = object else {
             return nil
         }
@@ -196,8 +195,7 @@ import Realm
     }
 
     /// Convert an RLMClientResetAfterBlock to a RealmSwift after block
-    @preconcurrency
-    public static func convert(object: RLMClientResetAfterBlock?) -> (@Sendable (Realm, Realm) -> Void)? {
+    public static func convert(object: RLMClientResetAfterBlock?) -> ((Realm, Realm) -> Void)? {
         guard let object = object else {
             return nil
         }
@@ -207,16 +205,14 @@ import Realm
     }
 
     /// Converts a swift block receiving a `SyncSubscriptionSet`to a RLMFlexibleSyncInitialSubscriptionsBlock receiving a `RLMSyncSubscriptionSet`.
-    @preconcurrency
-    public static func convert(block: @escaping @Sendable (SyncSubscriptionSet) -> Void) -> RLMFlexibleSyncInitialSubscriptionsBlock {
+    public static func convert(block: @escaping ((SyncSubscriptionSet) -> Void)) -> RLMFlexibleSyncInitialSubscriptionsBlock {
         return { subscriptionSet in
             return block(SyncSubscriptionSet(subscriptionSet))
         }
     }
 
     /// Converts a block receiving a `RLMSyncSubscriptionSet`to a swift block receiving a `SyncSubscriptionSet`.
-    @preconcurrency
-    public static func convert(block: RLMFlexibleSyncInitialSubscriptionsBlock?) -> (@Sendable (SyncSubscriptionSet) -> Void)? {
+    public static func convert(block: RLMFlexibleSyncInitialSubscriptionsBlock?) -> ((SyncSubscriptionSet) -> Void)? {
         guard let block = block else {
             return nil
         }

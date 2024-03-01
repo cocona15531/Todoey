@@ -16,9 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#import <Realm/RLMConstants.h>
+#import <Foundation/Foundation.h>
 
-RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
+NS_ASSUME_NONNULL_BEGIN
 
 @class RLMObjectSchema;
 
@@ -30,7 +30,6 @@ RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
 
  Schemas map to collections of tables in the core database.
  */
-RLM_SWIFT_SENDABLE // not actually immutable, but the public API kinda is
 @interface RLMSchema : NSObject<NSCopying>
 
 #pragma mark - Properties
@@ -75,4 +74,4 @@ RLM_SWIFT_SENDABLE // not actually immutable, but the public API kinda is
 
 @end
 
-RLM_HEADER_AUDIT_END(nullability, sendability)
+NS_ASSUME_NONNULL_END

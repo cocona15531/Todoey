@@ -20,7 +20,7 @@
 
 #import <Realm/RLMRealm.h>
 
-RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
+NS_ASSUME_NONNULL_BEGIN
 
 #pragma mark - Subscription
 
@@ -67,4 +67,4 @@ NSUInteger RLMFastEnumerate(NSFastEnumerationState *state,
 
 @end
 
-RLM_HEADER_AUDIT_END(nullability, sendability)
+NS_ASSUME_NONNULL_END

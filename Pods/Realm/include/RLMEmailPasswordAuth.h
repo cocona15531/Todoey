@@ -20,18 +20,16 @@
 
 @protocol RLMBSON;
 
-RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
-
 /// A block type used to report an error
-RLM_SWIFT_SENDABLE // invoked on a background thread
 typedef void(^RLMEmailPasswordAuthOptionalErrorBlock)(NSError * _Nullable);
+
+NS_ASSUME_NONNULL_BEGIN
 
 /**
   A client for the email/password authentication provider which
   can be used to obtain a credential for logging in,
   and to perform requests specifically related to the email/password provider.
 */
-RLM_SWIFT_SENDABLE RLM_FINAL // is internally thread-safe
 @interface RLMEmailPasswordAuth : RLMProviderClient
 
 /**
@@ -116,5 +114,5 @@ RLM_SWIFT_SENDABLE RLM_FINAL // is internally thread-safe
 
 @end
 
-RLM_HEADER_AUDIT_END(nullability, sendability)
+NS_ASSUME_NONNULL_END
 

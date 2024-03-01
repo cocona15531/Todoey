@@ -65,8 +65,17 @@ class REALM_NODISCARD StatusWith {
 public:
     using value_type = T;
 
-    template <typename Reason, std::enable_if_t<std::is_constructible_v<std::string_view, Reason>, int> = 0>
-    StatusWith(ErrorCodes::Error code, Reason reason)
+    StatusWith(ErrorCodes::Error code, StringData reason)
+        : m_status(code, reason)
+    {
+    }
+
+    StatusWith(ErrorCodes::Error code, const std::string& reason)
+        : m_status(code, reason)
+    {
+    }
+
+    StatusWith(ErrorCodes::Error code, const char* reason)
         : m_status(code, reason)
     {
     }
@@ -90,14 +99,12 @@ public:
     const T& get_value() const
     {
         REALM_ASSERT_DEBUG(is_ok());
-        REALM_ASSERT_RELEASE(m_value);
         return *m_value;
     }
 
     T& get_value()
     {
         REALM_ASSERT_DEBUG(is_ok());
-        REALM_ASSERT_RELEASE(m_value);
         return *m_value;
     }
 

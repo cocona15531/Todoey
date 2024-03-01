@@ -18,7 +18,6 @@
 
 #import <Realm/RLMEvent.h>
 
-#import "RLMError_Private.hpp"
 #import "RLMObjectSchema_Private.hpp"
 #import "RLMObjectStore.h"
 #import "RLMObject_Private.hpp"
@@ -70,7 +69,7 @@ util::UniqueFunction<void (std::exception_ptr)> wrapCompletion(void (^completion
     };
 }
 
-realm::AuditInterface *auditContext(RLMEventContext *context) {
+realm::AuditInterface *audit_context(RLMEventContext *context) {
     return reinterpret_cast<realm::AuditInterface *>(context);
 }
 
@@ -83,7 +82,7 @@ std::vector<std::pair<std::string, std::string>> convertMetadata(NSDictionary *m
     return ret;
 }
 
-std::optional<std::string> nsStringToOptionalString(NSString *str) {
+util::Optional<std::string> nsStringToOptionalString(NSString *str) {
     if (!str) {
         return util::none;
     }
@@ -94,30 +93,22 @@ std::optional<std::string> nsStringToOptionalString(NSString *str) {
 }
 } // anonymous namespace
 
-uint64_t RLMEventBeginScope(RLMEventContext *context, NSString *activity) {
-    return auditContext(context)->begin_scope(activity.UTF8String);
+void RLMEventBeginScope(RLMEventContext *context, NSString *activity) {
+    audit_context(context)->begin_scope(activity.UTF8String);
 }
 
-void RLMEventCommitScope(RLMEventContext *context, uint64_t scope_id, RLMEventCompletion completion) {
-    auditContext(context)->end_scope(scope_id, wrapCompletion(completion));
-}
-
-void RLMEventCancelScope(RLMEventContext *context, uint64_t scope_id) {
-    auditContext(context)->cancel_scope(scope_id);
-}
-
-bool RLMEventIsActive(RLMEventContext *context, uint64_t scope_id) {
-    return auditContext(context)->is_scope_valid(scope_id);
+void RLMEventEndScope(RLMEventContext *context, RLMEventCompletion completion) {
+    audit_context(context)->end_scope(wrapCompletion(completion));
 }
 
 void RLMEventRecordEvent(RLMEventContext *context, NSString *activity, NSString *event,
                          NSString *data, RLMEventCompletion completion) {
-    auditContext(context)->record_event(activity.UTF8String, nsStringToOptionalString(event),
+    audit_context(context)->record_event(activity.UTF8String, nsStringToOptionalString(event),
                                          nsStringToOptionalString(data), wrapCompletion(completion));
 }
 
 void RLMEventUpdateMetadata(RLMEventContext *context, NSDictionary<NSString *, NSString *> *newMetadata) {
-    auditContext(context)->update_metadata(convertMetadata(newMetadata));
+    audit_context(context)->update_metadata(convertMetadata(newMetadata));
 }
 
 RLMEventContext *RLMEventGetContext(RLMRealm *realm) {
@@ -216,7 +207,7 @@ private:
     }
     if (_errorHandler) {
         config->sync_error_handler = [eh = _errorHandler](realm::SyncError e) {
-            if (auto error = makeError(std::move(e))) {
+            if (auto error = RLMTranslateSyncError(e)) {
                 eh(error);
             }
         };

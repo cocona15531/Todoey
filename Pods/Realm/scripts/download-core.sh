@@ -21,18 +21,12 @@ copy_core() {
     # XCFramework processing only copies the "realm" headers, so put the third-party ones in a known location
     mkdir -p "$dst/include"
     find "$src" -name external -exec ditto "{}" "$dst/include/external" \; -quit
-
-    # Remove the C API header to avoid accidentally pulling it in
-    find "$dst" -name realm.h -delete
 }
 
 tries_left=3
 readonly version="$REALM_CORE_VERSION"
-nightly_version=""
-if [[ "$REALM_CORE_VERSION" == *"nightly"* ]]; then
-  nightly_version="v${version}/cocoa/"
-fi
-readonly url="${REALM_BASE_URL}/core/${nightly_version}realm-monorepo-xcframework-v${version}.tar.xz"
+readonly url="${REALM_BASE_URL}/core/realm-monorepo-xcframework-v${version}.tar.xz"
+
 # First check if we need to do anything
 if [ -e "$dst" ]; then
     if [ -e "$dst/version.txt" ]; then

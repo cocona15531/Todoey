@@ -21,7 +21,7 @@
 
 @class RLMObjectBase, RLMProperty;
 
-RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
+NS_ASSUME_NONNULL_BEGIN
 
 @interface RLMArray ()
 - (instancetype)initWithObjectClassName:(NSString *)objectClassName;
@@ -41,4 +41,4 @@ RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
 
 void RLMArrayValidateMatchingObjectType(RLMArray *array, id value);
 
-RLM_HEADER_AUDIT_END(nullability, sendability)
+NS_ASSUME_NONNULL_END

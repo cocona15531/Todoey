@@ -29,7 +29,7 @@
 
 namespace realm {
 
-class ClusterTree;
+class TableClusterTree;
 class Replication;
 class TableView;
 class CollectionBase;
@@ -94,7 +94,7 @@ enum class UpdateStatus {
 // 'Object' would have been a better name, but it clashes with a class in ObjectStore
 class Obj {
 public:
-    constexpr Obj()
+    Obj()
         : m_table(nullptr)
         , m_row_ndx(size_t(-1))
         , m_storage_version(-1)
@@ -130,6 +130,8 @@ public:
 
     /// Check if the object is still alive
     bool is_valid() const noexcept;
+    /// Will throw if object is not valid
+    void check_valid() const;
     /// Delete object from table. Object is invalid afterwards.
     void remove();
     /// Invalidate
@@ -230,10 +232,6 @@ public:
     // new object and link it. (To Be Implemented)
     Obj clear_linked_object(ColKey col_key);
     Obj& set_any(ColKey col_key, Mixed value, bool is_default = false);
-    Obj& set_any(StringData col_name, Mixed value, bool is_default = false)
-    {
-        return set_any(get_column_key(col_name), value, is_default);
-    }
 
     template <typename U>
     Obj& set(StringData col_name, U value, bool is_default = false)
@@ -262,13 +260,7 @@ public:
     template <class Head, class... Tail>
     Obj& set_all(Head v, Tail... tail);
 
-    // The main algorithm for handling schema migrations if we try to convert
-    // from TopLevel* to Embedded, in this case all the orphan objects are deleted
-    // and all the objects with multiple backlinks are cloned in order to avoid to
-    // get schema violations during the migration.
-    // By default this alogirithm is disabled. RealmConfig contains a boolean flag
-    // to enable it.
-    void handle_multiple_backlinks_during_schema_migration();
+    void assign(const Obj& other);
 
     Obj get_linked_object(ColKey link_col_key) const
     {
@@ -278,7 +270,6 @@ public:
     {
         return get_linked_object(get_column_key(link_col_name));
     }
-    Obj get_parent_object() const;
 
     template <typename U>
     Lst<U> get_list(ColKey col_key) const;
@@ -312,7 +303,6 @@ public:
     template <typename U>
     SetPtr<U> get_set_ptr(ColKey col_key) const;
     LnkSet get_linkset(ColKey col_key) const;
-    LnkSet get_linkset(StringData col_name) const;
     LnkSetPtr get_linkset_ptr(ColKey col_key) const;
     SetBasePtr get_setbase_ptr(ColKey col_key) const;
     Dictionary get_dictionary(ColKey col_key) const;
@@ -376,7 +366,7 @@ private:
     template <class T>
     bool do_is_null(ColKey::Idx col_ndx) const;
 
-    const ClusterTree* get_tree_top() const;
+    const TableClusterTree* get_tree_top() const;
     ColKey get_column_key(StringData col_name) const;
     ColKey get_primary_key_column() const;
     TableKey get_table_key() const;
@@ -430,27 +420,12 @@ private:
     bool remove_backlink(ColKey col_key, ObjLink old_link, CascadeState& state) const;
     template <class T>
     inline void set_spec(T&, ColKey);
-    template <class ValueType>
-    inline void nullify_single_link(ColKey col, ValueType target);
-
-    void fix_linking_object_during_schema_migration(Obj linking_obj, Obj obj, ColKey opposite_col_key) const;
 };
 
 std::ostream& operator<<(std::ostream&, const Obj& obj);
 
 template <>
-int64_t Obj::get(ColKey) const;
-template <>
-bool Obj::get(ColKey) const;
-
-template <>
 int64_t Obj::_get(ColKey::Idx col_ndx) const;
-template <>
-StringData Obj::_get(ColKey::Idx col_ndx) const;
-template <>
-BinaryData Obj::_get(ColKey::Idx col_ndx) const;
-template <>
-ObjKey Obj::_get(ColKey::Idx col_ndx) const;
 
 struct Obj::FatPathElement {
     Obj obj;        // Object which embeds...

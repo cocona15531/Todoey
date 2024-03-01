@@ -141,12 +141,6 @@ extension Projection: KeypathSortable {}
     public static func == (lhs: Results<Element>, rhs: Results<Element>) -> Bool {
         lhs.collection.isEqual(rhs.collection)
     }
-
-    /// :nodoc:
-    public func makeIterator() -> RLMIterator<Element> {
-        return RLMIterator(collection: collection)
-    }
-
 }
 
 extension Results: Encodable where Element: Encodable {}

@@ -16,16 +16,15 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#import <Foundation/Foundation.h>
+
 #import <Realm/RLMConstants.h>
 #import <Realm/RLMThreadSafeReference.h>
 
-RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
+NS_ASSUME_NONNULL_BEGIN
 
-@protocol RLMValue;
-@class RLMRealm, RLMResults, RLMSortDescriptor, RLMNotificationToken, RLMCollectionChange, RLMSectionedResults;
+@class RLMRealm, RLMResults, RLMSortDescriptor, RLMNotificationToken, RLMCollectionChange;
 typedef RLM_CLOSED_ENUM(int32_t, RLMPropertyType);
-/// A callback which is invoked on each element in the Results collection which returns the section key.
-typedef id<RLMValue> _Nullable(^RLMSectionedResultsKeyBlock)(id);
 
 /**
  A homogenous collection of Realm-managed objects. Examples of conforming types
@@ -257,8 +256,9 @@ the block is not called at all. See the `RLMCollectionChange` documentation for
 information on how the changes are reported and an example of updating a
 `UITableView`.
 
- The error parameter is present only for backwards compatibility and will always
- be `nil`.
+If an error occurs the block will be called with `nil` for the results
+parameter and a non-`nil` error. Currently there are no expected errors and
+this parameter remains only for compatiblity.
 
 At the time when the block is called, the collection object will be fully
 evaluated and up-to-date, and as long as you do not perform a write transaction
@@ -319,8 +319,9 @@ the block is not called at all. See the `RLMCollectionChange` documentation for
 information on how the changes are reported and an example of updating a
 `UITableView`.
 
- The error parameter is present only for backwards compatibility and will always
- be `nil`.
+If an error occurs the block will be called with `nil` for the results
+parameter and a non-`nil` error. Currently there are no expected errors and
+this parameter remains only for compatiblity.
 
 At the time when the block is called, the collection object will be fully
 evaluated and up-to-date, and as long as you do not perform a write transaction
@@ -362,8 +363,9 @@ the block is not called at all. See the `RLMCollectionChange` documentation for
 information on how the changes are reported and an example of updating a
 `UITableView`.
 
- The error parameter is present only for backwards compatibility and will always
- be `nil`.
+If an error occurs the block will be called with `nil` for the results
+parameter and a non-`nil` error. Currently there are no expected errors and
+this parameter remains only for compatiblity.
 
 At the time when the block is called, the collection object will be fully
 evaluated and up-to-date, and as long as you do not perform a write transaction
@@ -382,7 +384,7 @@ to be sent to the block. To stop receiving updates, call `-invalidate` on the to
 
 @param block The block to be called whenever a change occurs.
 @param queue The serial queue to deliver notifications to.
-@param keyPaths The block will be called for changes occurring on these keypaths. If no
+@param keyPaths The block will be called for changes occuring on these keypaths. If no
 key paths are given, notifications are delivered for every property key path.
 @return A token which must be held for as long as you want updates to be delivered.
 */
@@ -392,38 +394,6 @@ key paths are given, notifications are delivered for every property key path.
                                       keyPaths:(nullable NSArray<NSString *> *)keyPaths
                                          queue:(nullable dispatch_queue_t)queue
 __attribute__((warn_unused_result));
-
-#pragma mark - Sectioned Results
-
-/**
- Sorts and sections this collection from a given property key path, returning the result
- as an instance of `RLMSectionedResults`.
-
- @param keyPath The property key path to sort on.
- @param ascending The direction to sort in.
- @param keyBlock  A callback which is invoked on each element in the Results collection.
-                 This callback is to return the section key for the element in the collection.
-
- @return An instance of RLMSectionedResults.
- */
-- (RLMSectionedResults *)sectionedResultsSortedUsingKeyPath:(NSString *)keyPath
-                                                  ascending:(BOOL)ascending
-                                                   keyBlock:(RLMSectionedResultsKeyBlock)keyBlock;
-
-/**
- Sorts and sections this collection from a given array of sort descriptors, returning the result
- as an instance of `RLMSectionedResults`.
-
- @param sortDescriptors  An array of `RLMSortDescriptor`s to sort by.
- @param keyBlock  A callback which is invoked on each element in the Results collection.
-                 This callback is to return the section key for the element in the collection.
-
- @note The primary sort descriptor must be responsible for determining the section key.
-
- @return An instance of RLMSectionedResults.
- */
-- (RLMSectionedResults *)sectionedResultsUsingSortDescriptors:(NSArray<RLMSortDescriptor *> *)sortDescriptors
-                                                     keyBlock:(RLMSectionedResultsKeyBlock)keyBlock;
 
 #pragma mark - Aggregating Property Values
 
@@ -530,7 +500,6 @@ __attribute__((warn_unused_result));
 
  `RLMSortDescriptor` instances are immutable.
  */
-RLM_SWIFT_SENDABLE RLM_FINAL
 @interface RLMSortDescriptor : NSObject
 
 #pragma mark - Properties
@@ -610,4 +579,4 @@ RLM_SWIFT_SENDABLE RLM_FINAL
 - (NSArray<NSIndexPath *> *)modificationsInSection:(NSUInteger)section;
 @end
 
-RLM_HEADER_AUDIT_END(nullability, sendability)
+NS_ASSUME_NONNULL_END

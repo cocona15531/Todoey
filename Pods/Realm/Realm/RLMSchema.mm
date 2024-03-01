@@ -31,7 +31,6 @@
 #import <realm/object-store/object_schema.hpp>
 #import <realm/object-store/object_store.hpp>
 #import <realm/object-store/schema.hpp>
-#import <realm/util/scope_exit.hpp>
 
 #import <mutex>
 #import <objc/runtime.h>
@@ -110,13 +109,8 @@ static RLMObjectSchema *registerClass(Class cls) {
 
     auto prevState = s_sharedSchemaState;
     s_sharedSchemaState = SharedSchemaState::Initializing;
-    RLMObjectSchema *schema;
-    {
-        util::ScopeExit cleanup([&]() noexcept {
-            s_sharedSchemaState = prevState;
-        });
-        schema = [RLMObjectSchema schemaForObjectClass:cls];
-    }
+    RLMObjectSchema *schema = [RLMObjectSchema schemaForObjectClass:cls];
+    s_sharedSchemaState = prevState;
 
     createAccessors(schema);
     // override sharedSchema class methods for performance

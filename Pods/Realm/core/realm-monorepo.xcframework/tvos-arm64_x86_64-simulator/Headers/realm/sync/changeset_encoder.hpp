@@ -7,7 +7,7 @@
 namespace realm {
 namespace sync {
 
-struct ChangesetEncoder {
+struct ChangesetEncoder : InstructionHandler {
     using Buffer = util::AppendBuffer<char>;
 
     Buffer release() noexcept;
@@ -15,12 +15,12 @@ struct ChangesetEncoder {
     Buffer& buffer() noexcept;
     InternString intern_string(StringData);
 
-    void set_intern_string(uint32_t index, StringBufferRange);
+    void set_intern_string(uint32_t index, StringBufferRange) override;
     // FIXME: This doesn't copy the input, but the drawback is that there can
     // only be a single StringBufferRange per instruction. Luckily, no
     // instructions exist that require two or more.
-    StringBufferRange add_string_range(StringData);
-    void operator()(const Instruction&);
+    StringBufferRange add_string_range(StringData) override;
+    void operator()(const Instruction&) override;
 
 #define REALM_DEFINE_INSTRUCTION_HANDLER(X) void operator()(const Instruction::X&);
     REALM_FOR_EACH_INSTRUCTION_TYPE(REALM_DEFINE_INSTRUCTION_HANDLER)

@@ -29,6 +29,7 @@
 
 #include <realm/util/features.h>
 #include <realm/util/assert.hpp>
+#include <realm/util/type_traits.hpp>
 
 namespace realm {
 namespace util {

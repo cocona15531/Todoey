@@ -28,6 +28,15 @@
 #import "RLMThreadSafeReference_Private.hpp"
 #import "RLMUtil.hpp"
 
+// See -countByEnumeratingWithState:objects:count
+@interface RLMSetHolder : NSObject {
+@public
+    std::unique_ptr<id[]> items;
+}
+@end
+@implementation RLMSetHolder
+@end
+
 @interface RLMSet () <RLMThreadConfined_Private>
 @end
 
@@ -161,32 +170,6 @@
     return [self objectAtIndex:index];
 }
 
-// The compiler complains about the method's argument type not matching due to
-// it not having the generic type attached, but it doesn't seem to be possible
-// to actually include the generic type
-// http://www.openradar.me/radar?id=6135653276319744
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wmismatched-parameter-types"
-- (RLMNotificationToken *)addNotificationBlock:(void (^)(RLMArray *, RLMCollectionChange *, NSError *))block {
-    return RLMAddNotificationBlock(self, block, nil, nil);
-}
-- (RLMNotificationToken *)addNotificationBlock:(void (^)(RLMArray *, RLMCollectionChange *, NSError *))block
-                                         queue:(dispatch_queue_t)queue {
-    return RLMAddNotificationBlock(self, block, nil, queue);
-}
-
-- (RLMNotificationToken *)addNotificationBlock:(void (^)(RLMArray *, RLMCollectionChange *, NSError *))block
-                                      keyPaths:(NSArray<NSString *> *)keyPaths {
-    return RLMAddNotificationBlock(self, block, keyPaths,nil);
-}
-
-- (RLMNotificationToken *)addNotificationBlock:(void (^)(RLMArray *, RLMCollectionChange *, NSError *))block
-                                      keyPaths:(NSArray<NSString *> *)keyPaths
-                                         queue:(dispatch_queue_t)queue {
-    return RLMAddNotificationBlock(self, block, keyPaths, queue);
-}
-#pragma clang diagnostic pop
-
 #pragma mark - Unmanaged RLMSet implementation
 
 - (RLMRealm *)realm {
@@ -230,7 +213,32 @@
 - (NSUInteger)countByEnumeratingWithState:(NSFastEnumerationState *)state
                                   objects:(__unused __unsafe_unretained id [])buffer
                                     count:(__unused NSUInteger)len {
-    return RLMUnmanagedFastEnumerate(_backingCollection, state);
+    if (state->state != 0) {
+        return 0;
+    }
+
+    // We need to enumerate a copy of the backing set so that it doesn't
+    // reflect changes made during enumeration. This copy has to be autoreleased
+    // (since there's nowhere for us to store a strong reference), and uses
+    // RLMSetHolder rather than an NSArray because NSArray doesn't guarantee
+    // that it'll use a single contiguous block of memory, and if it doesn't
+    // we'd need to forward multiple calls to this method to the same NSArray,
+    // which would require holding a reference to it somewhere.
+    __autoreleasing RLMSetHolder *copy = [[RLMSetHolder alloc] init];
+    copy->items = std::make_unique<id[]>(self.count);
+
+    NSUInteger i = 0;
+    for (id object in _backingCollection) {
+        copy->items[i++] = object;
+    }
+
+    state->itemsPtr = (__unsafe_unretained id *)(void *)copy->items.get();
+    // needs to point to something valid, but the whole point of this is so
+    // that it can't be changed
+    state->mutationsPtr = state->extra;
+    state->state = i;
+
+    return i;
 }
 
 static void changeSet(__unsafe_unretained RLMSet *const set,
@@ -504,14 +512,28 @@ void RLMSetValidateMatchingObjectType(__unsafe_unretained RLMSet *const set,
     @throw RLMException(@"This method may only be called on RLMSet instances retrieved from an RLMRealm");
 }
 
-- (RLMSectionedResults *)sectionedResultsSortedUsingKeyPath:(NSString *)keyPath
-                                                  ascending:(BOOL)ascending
-                                                   keyBlock:(RLMSectionedResultsKeyBlock)keyBlock {
+// The compiler complains about the method's argument type not matching due to
+// it not having the generic type attached, but it doesn't seem to be possible
+// to actually include the generic type
+// http://www.openradar.me/radar?id=6135653276319744
+#pragma clang diagnostic ignored "-Wmismatched-parameter-types"
+- (RLMNotificationToken *)addNotificationBlock:(void (^)(RLMSet *, RLMCollectionChange *, NSError *))block {
+    return [self addNotificationBlock:block queue:nil];
+}
+
+- (RLMNotificationToken *)addNotificationBlock:(void (^)(RLMSet *, RLMCollectionChange *, NSError *))block
+                                         queue:(nullable dispatch_queue_t)queue {
     @throw RLMException(@"This method may only be called on RLMSet instances retrieved from an RLMRealm");
 }
 
-- (RLMSectionedResults *)sectionedResultsUsingSortDescriptors:(NSArray<RLMSortDescriptor *> *)sortDescriptors
-                                                     keyBlock:(RLMSectionedResultsKeyBlock)keyBlock {
+- (RLMNotificationToken *)addNotificationBlock:(void (^)(RLMSet *, RLMCollectionChange *, NSError *))block
+                                      keyPaths:(nullable NSArray<NSString *> *)keyPaths
+                                         queue:(nullable dispatch_queue_t)queue {
+    @throw RLMException(@"This method may only be called on RLMSet instances retrieved from an RLMRealm");
+}
+
+- (RLMNotificationToken *)addNotificationBlock:(void (^)(RLMSet *, RLMCollectionChange *, NSError *))block
+                                      keyPaths:(nullable NSArray<NSString *> *)keyPaths {
     @throw RLMException(@"This method may only be called on RLMSet instances retrieved from an RLMRealm");
 }
 

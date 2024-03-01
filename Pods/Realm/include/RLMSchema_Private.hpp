@@ -25,7 +25,6 @@ namespace realm {
     class ObjectSchema;
 }
 
-RLM_DIRECT_MEMBERS
 @interface RLMSchema ()
 + (instancetype)dynamicSchemaFromObjectStoreSchema:(realm::Schema const&)objectStoreSchema;
 - (realm::Schema)objectStoreCopy;

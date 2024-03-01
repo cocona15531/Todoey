@@ -21,14 +21,14 @@
 #include <future>
 
 namespace realm {
-struct RealmConfig;
+class Replication;
 
 namespace _impl {
 class RealmCoordinator;
 
 class ExternalCommitHelper {
 public:
-    ExternalCommitHelper(RealmCoordinator& parent, const RealmConfig&);
+    ExternalCommitHelper(RealmCoordinator& parent);
     ~ExternalCommitHelper();
 
     // A no-op in this version, but needed for the Apple version
@@ -37,7 +37,8 @@ public:
 private:
     RealmCoordinator& m_parent;
 
-    // A DB used to listen for changes
+    // A shared group used to listen for changes
+    std::unique_ptr<Replication> m_history;
     DBRef m_sg;
 
     // The listener thread

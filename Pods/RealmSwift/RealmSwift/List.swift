@@ -210,6 +210,7 @@ public final class List<Element: RealmCollectionValue>: RLMSwiftCollectionBase, 
         rlmArray.exchangeObject(at: UInt(index1), withObjectAt: UInt(index2))
     }
 
+    // swiftlint:disable:next identifier_name
     @objc class func _unmanagedCollection() -> RLMArray<AnyObject> {
         if let type = Element.self as? ObjectBase.Type {
             return RLMArray(objectClassName: type.className())
@@ -350,16 +351,11 @@ extension List: MutableCollection {
     public func move(fromOffsets offsets: IndexSet, toOffset destination: Int) {
         for offset in offsets {
             var d = destination
-            if destination > offset {
+            if destination >= count {
                 d = destination - 1
             }
             move(from: offset, to: d)
         }
-    }
-
-    /// :nodoc:
-    public func makeIterator() -> RLMIterator<Element> {
-        return RLMIterator(collection: collection)
     }
 }
 

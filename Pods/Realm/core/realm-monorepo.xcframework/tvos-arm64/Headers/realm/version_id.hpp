@@ -34,34 +34,36 @@ struct VersionID {
     version_type version = std::numeric_limits<version_type>::max();
     uint_fast32_t index = 0;
 
-    constexpr VersionID() = default;
-    constexpr VersionID(version_type initial_version, uint_fast32_t initial_index) noexcept
+    VersionID()
+    {
+    }
+    VersionID(version_type initial_version, uint_fast32_t initial_index)
     {
         version = initial_version;
         index = initial_index;
     }
 
-    constexpr bool operator==(const VersionID& other) const noexcept
+    bool operator==(const VersionID& other) const
     {
         return version == other.version;
     }
-    constexpr bool operator!=(const VersionID& other) const noexcept
+    bool operator!=(const VersionID& other) const
     {
         return version != other.version;
     }
-    constexpr bool operator<(const VersionID& other) const noexcept
+    bool operator<(const VersionID& other) const
     {
         return version < other.version;
     }
-    constexpr bool operator<=(const VersionID& other) const noexcept
+    bool operator<=(const VersionID& other) const
     {
         return version <= other.version;
     }
-    constexpr bool operator>(const VersionID& other) const noexcept
+    bool operator>(const VersionID& other) const
     {
         return version > other.version;
     }
-    constexpr bool operator>=(const VersionID& other) const noexcept
+    bool operator>=(const VersionID& other) const
     {
         return version >= other.version;
     }

@@ -18,7 +18,7 @@
 
 #import <Realm/RLMMongoClient.h>
 
-RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
+NS_ASSUME_NONNULL_BEGIN
 
 @class RLMUser;
 
@@ -33,4 +33,4 @@ RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
 
 @end
 
-RLM_HEADER_AUDIT_END(nullability, sendability)
+NS_ASSUME_NONNULL_END

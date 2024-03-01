@@ -20,7 +20,7 @@
 
 @class RLMObjectBase, RLMProperty;
 
-RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
+NS_ASSUME_NONNULL_BEGIN
 
 @interface RLMDictionary ()
 - (instancetype)initWithObjectClassName:(NSString *)objectClassName keyType:(RLMPropertyType)keyType;
@@ -40,7 +40,7 @@ RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
 FOUNDATION_EXTERN NSString *RLMDictionaryDescriptionWithMaxDepth(NSString *name,
                                                                  RLMDictionary *dictionary,
                                                                  NSUInteger depth);
-id RLMDictionaryKey(RLMDictionary *dictionary, id key) RLM_HIDDEN;
-id RLMDictionaryValue(RLMDictionary *dictionary, id value) RLM_HIDDEN;
+id RLMDictionaryKey(RLMDictionary *dictionary, id key) REALM_HIDDEN;
+id RLMDictionaryValue(RLMDictionary *dictionary, id value) REALM_HIDDEN;
 
-RLM_HEADER_AUDIT_END(nullability, sendability)
+NS_ASSUME_NONNULL_END

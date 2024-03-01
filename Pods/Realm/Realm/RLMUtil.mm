@@ -22,7 +22,6 @@
 #import "RLMAccessor.hpp"
 #import "RLMDecimal128_Private.hpp"
 #import "RLMDictionary_Private.h"
-#import "RLMError_Private.hpp"
 #import "RLMObjectId_Private.hpp"
 #import "RLMObjectSchema_Private.hpp"
 #import "RLMObjectStore.h"
@@ -37,7 +36,14 @@
 #import "RLMValue.h"
 
 #import <realm/mixed.hpp>
+#import <realm/object-store/shared_realm.hpp>
+#import <realm/table_view.hpp>
 #import <realm/util/overload.hpp>
+
+#if REALM_ENABLE_SYNC
+#import "RLMSyncUtil.h"
+#import <realm/sync/client.hpp>
+#endif
 
 #include <sys/sysctl.h>
 #include <sys/types.h>
@@ -66,7 +72,6 @@ static inline bool checkCollectionType(__unsafe_unretained id<RLMCollection> con
         && (type != RLMPropertyTypeObject || [collection.objectClassName isEqualToString:objectClassName]);
 }
 
-static id (*s_bridgeValue)(id);
 id<NSFastEnumeration> RLMAsFastEnumeration(__unsafe_unretained id obj) {
     if (!obj) {
         return nil;
@@ -74,8 +79,8 @@ id<NSFastEnumeration> RLMAsFastEnumeration(__unsafe_unretained id obj) {
     if ([obj conformsToProtocol:@protocol(NSFastEnumeration)]) {
         return obj;
     }
-    if (s_bridgeValue) {
-        id bridged = s_bridgeValue(obj);
+    if (RLMSwiftBridgeValue) {
+        id bridged = RLMSwiftBridgeValue(obj);
         if ([bridged conformsToProtocol:@protocol(NSFastEnumeration)]) {
             return bridged;
         }
@@ -83,15 +88,12 @@ id<NSFastEnumeration> RLMAsFastEnumeration(__unsafe_unretained id obj) {
     return nil;
 }
 
-void RLMSetSwiftBridgeCallback(id (*callback)(id)) {
-    s_bridgeValue = callback;
-}
-
+id (*RLMSwiftBridgeValue)(id);
 id RLMBridgeSwiftValue(__unsafe_unretained id value) {
-    if (!value || !s_bridgeValue) {
+    if (!value || !RLMSwiftBridgeValue) {
         return nil;
     }
-    return s_bridgeValue(value);
+    return RLMSwiftBridgeValue(value);
 }
 
 bool RLMIsSwiftObjectClass(Class cls) {
@@ -346,10 +348,59 @@ NSException *RLMException(std::exception const& exception) {
     return RLMException(@"%s", exception.what());
 }
 
-NSException *RLMException(realm::Exception const& exception) {
-    return RLMException(@(exception.what()),
-                        @{@"Error Code": @(exception.code()),
-                          @"Underlying": makeError(exception.to_status())});
+NSError *RLMMakeError(RLMError code, NSString *msg) {
+    return [NSError errorWithDomain:RLMErrorDomain
+                               code:code
+                           userInfo:@{NSLocalizedDescriptionKey: msg,
+                                      @"Error Code": @(code)}];
+}
+
+NSError *RLMMakeError(RLMError code, std::exception const& exception) {
+    return [NSError errorWithDomain:RLMErrorDomain
+                               code:code
+                           userInfo:@{NSLocalizedDescriptionKey: @(exception.what()),
+                                      @"Error Code": @(code)}];
+}
+
+NSError *RLMMakeError(RLMError code, const realm::util::File::AccessError& exception) {
+    return [NSError errorWithDomain:RLMErrorDomain
+                               code:code
+                           userInfo:@{NSLocalizedDescriptionKey: @(exception.what()),
+                                      NSFilePathErrorKey: @(exception.get_path().c_str()),
+                                      @"Error Code": @(code)}];
+}
+
+NSError *RLMMakeError(RLMError code, const realm::RealmFileException& exception) {
+    NSString *underlying = @(exception.underlying().c_str());
+    return [NSError errorWithDomain:RLMErrorDomain
+                               code:code
+                           userInfo:@{NSLocalizedDescriptionKey: @(exception.what()),
+                                      NSFilePathErrorKey: @(exception.path().c_str()),
+                                      @"Error Code": @(code),
+                                      @"Underlying": underlying.length == 0 ? @"n/a" : underlying}];
+}
+
+NSError *RLMMakeError(std::system_error const& exception) {
+    int code = exception.code().value();
+    BOOL isGenericCategoryError = (exception.code().category() == std::generic_category());
+    NSString *category = @(exception.code().category().name());
+    NSString *errorDomain = isGenericCategoryError ? NSPOSIXErrorDomain : RLMUnknownSystemErrorDomain;
+#if REALM_ENABLE_SYNC
+    if (exception.code().category() == realm::sync::client_error_category()) {
+        if (exception.code().value() == static_cast<int>(realm::sync::Client::Error::connect_timeout)) {
+            errorDomain = NSPOSIXErrorDomain;
+            code = ETIMEDOUT;
+        }
+        else {
+            errorDomain = RLMSyncErrorDomain;
+        }
+    }
+#endif
+
+    return [NSError errorWithDomain:errorDomain code:code
+                           userInfo:@{NSLocalizedDescriptionKey: @(exception.what()),
+                                      @"Error Code": @(exception.code().value()),
+                                      @"Category": category}];
 }
 
 void RLMSetErrorOrThrow(NSError *error, NSError **outError) {
@@ -357,7 +408,11 @@ void RLMSetErrorOrThrow(NSError *error, NSError **outError) {
         *outError = error;
     }
     else {
-        @throw RLMException(error.localizedDescription, @{NSUnderlyingErrorKey: error});
+        NSString *msg = error.localizedDescription;
+        if (error.userInfo[NSFilePathErrorKey]) {
+            msg = [NSString stringWithFormat:@"%@: %@", error.userInfo[NSFilePathErrorKey], error.localizedDescription];
+        }
+        @throw RLMException(msg, @{NSUnderlyingErrorKey: error});
     }
 }
 

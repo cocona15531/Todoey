@@ -18,11 +18,14 @@
 
 #import "RLMPushClient.h"
 
-namespace realm::app {
+namespace realm {
+namespace app {
 class PushClient;
 }
+}
 
-RLM_DIRECT_MEMBERS
 @interface RLMPushClient ()
+
 - (instancetype)initWithPushClient:(realm::app::PushClient&&)pushClient;
+
 @end

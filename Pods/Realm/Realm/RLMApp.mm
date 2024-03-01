@@ -21,7 +21,6 @@
 #import "RLMBSON_Private.hpp"
 #import "RLMCredentials_Private.hpp"
 #import "RLMEmailPasswordAuth.h"
-#import "RLMLogger.h"
 #import "RLMPushClient_Private.hpp"
 #import "RLMSyncManager_Private.hpp"
 #import "RLMUser_Private.hpp"
@@ -43,7 +42,7 @@ namespace {
     public:
         CocoaNetworkTransport(id<RLMNetworkTransport> transport) : m_transport(transport) {}
 
-        void send_request_to_server(const app::Request& request,
+        void send_request_to_server(app::Request&& request,
                                     util::UniqueFunction<void(const app::Response&)>&& completion) override {
             // Convert the app::Request to an RLMRequest
             auto rlmRequest = [RLMRequest new];
@@ -99,13 +98,6 @@ namespace {
     return nil;
 }
 
-- (instancetype)init {
-    return [self initWithBaseURL:nil
-                       transport:nil
-                    localAppName:nil
-                 localAppVersion:nil];
-}
-
 - (instancetype)initWithBaseURL:(nullable NSString *)baseURL
                       transport:(nullable id<RLMNetworkTransport>)transport
                    localAppName:(nullable NSString *)localAppName
@@ -119,7 +111,7 @@ namespace {
 
 - (instancetype)initWithBaseURL:(nullable NSString *)baseURL
                       transport:(nullable id<RLMNetworkTransport>)transport
-                   localAppName:(nullable NSString *)localAppName
+                   localAppName:(NSString *)localAppName
                 localAppVersion:(nullable NSString *)localAppVersion
         defaultRequestTimeoutMS:(NSUInteger)defaultRequestTimeoutMS {
     if (self = [super init]) {
@@ -129,19 +121,10 @@ namespace {
         self.localAppVersion = localAppVersion;
         self.defaultRequestTimeoutMS = defaultRequestTimeoutMS;
 
-        _config.device_info.sdk = "Realm Swift";
+        _config.platform = "Realm Cocoa";
 
-        // Platform info isn't available when running via `swift test`.
-        // Non-Xcode SPM builds can't build for anything but macOS, so this is
-        // probably unimportant for now and we can just report "unknown"
-        auto processInfo = [NSProcessInfo processInfo];
-        auto platform = [processInfo.environment[@"RUN_DESTINATION_DEVICE_PLATFORM_IDENTIFIER"]
-                         componentsSeparatedByString:@"."].lastObject;
-        RLMNSStringToStdString(_config.device_info.platform,
-                               platform ?: @"unknown");
-        RLMNSStringToStdString(_config.device_info.platform_version,
-                               [processInfo operatingSystemVersionString] ?: @"unknown");
-        RLMNSStringToStdString(_config.device_info.sdk_version, REALM_COCOA_VERSION);
+        RLMNSStringToStdString(_config.platform_version, [[NSProcessInfo processInfo] operatingSystemVersionString]);
+        RLMNSStringToStdString(_config.sdk_version, REALM_COCOA_VERSION);
         return self;
     }
     return nil;
@@ -163,14 +146,11 @@ namespace {
     return nil;
 }
 
-static void setOptionalString(std::optional<std::string>& dst, NSString *src) {
-    std::string tmp;
-    RLMNSStringToStdString(tmp, src);
-    dst = tmp.empty() ? util::none : std::optional(std::move(tmp));
-}
-
 - (void)setBaseURL:(nullable NSString *)baseURL {
-    setOptionalString(_config.base_url, baseURL);
+    std::string base_url;
+    RLMNSStringToStdString(base_url, baseURL);
+    _config.base_url = base_url.empty() ? util::none : util::Optional(base_url);
+    return;
 }
 
 - (id<RLMNetworkTransport>)transport {
@@ -193,7 +173,10 @@ static void setOptionalString(std::optional<std::string>& dst, NSString *src) {
 }
 
 - (void)setLocalAppName:(nullable NSString *)localAppName {
-    setOptionalString(_config.local_app_name, localAppName);
+    std::string local_app_name;
+    RLMNSStringToStdString(local_app_name, localAppName);
+    _config.local_app_name = local_app_name.empty() ? util::none : util::Optional(local_app_name);
+    return;
 }
 
 - (NSString *)localAppVersion {
@@ -205,7 +188,10 @@ static void setOptionalString(std::optional<std::string>& dst, NSString *src) {
 }
 
 - (void)setLocalAppVersion:(nullable NSString *)localAppVersion {
-    setOptionalString(_config.local_app_version, localAppVersion);
+    std::string local_app_version;
+    RLMNSStringToStdString(local_app_version, localAppVersion);
+    _config.local_app_version = local_app_version.empty() ? util::none : util::Optional(local_app_version);
+    return;
 }
 
 - (NSUInteger)defaultRequestTimeoutMS {
@@ -218,24 +204,32 @@ static void setOptionalString(std::optional<std::string>& dst, NSString *src) {
 
 @end
 
+NSError *RLMAppErrorToNSError(realm::app::AppError const& appError) {
+    return [[NSError alloc] initWithDomain:@(appError.error_code.category().name())
+                                      code:appError.error_code.value()
+                                  userInfo:@{
+                                      @(appError.error_code.category().name()) : @(appError.error_code.message().data()),
+                                      NSLocalizedDescriptionKey : @(appError.message.c_str())
+                                  }];
+}
+
 #pragma mark RLMAppSubscriptionToken
-
 @implementation RLMAppSubscriptionToken {
-    std::shared_ptr<app::App> _app;
-    std::optional<app::App::Token> _token;
+@public
+    std::unique_ptr<realm::Subscribable<app::App>::Token> _token;
 }
 
-- (instancetype)initWithApp:(std::shared_ptr<app::App>)app token:(app::App::Token&&)token {
+- (instancetype)initWithToken:(realm::Subscribable<app::App>::Token&&)token {
     if (self = [super init]) {
-        _app = std::move(app);
-        _token = std::move(token);
+        _token = std::make_unique<realm::Subscribable<app::App>::Token>(std::move(token));
+        return self;
     }
-    return self;
+
+    return nil;
 }
 
-- (void)unsubscribe {
-    _token.reset();
-    _app.reset();
+- (NSUInteger)value {
+    return _token->value();
 }
 @end
 
@@ -248,13 +242,6 @@ static void setOptionalString(std::optional<std::string>& dst, NSString *src) {
 @end
 
 @implementation RLMApp : NSObject
-
-+ (void)initialize {
-    [RLMRealm class];
-    // Even though there is nothing to log when the App initialises, we want to
-    // be able to log anything happening after this e.g. login/register.
-    [RLMLogger class];
-}
 
 - (instancetype)initWithApp:(std::shared_ptr<realm::app::App>)app {
     if (self = [super init]) {
@@ -322,29 +309,12 @@ static std::mutex& s_appMutex = *new std::mutex();
     return app;
 }
 
-+ (instancetype)uncachedAppWithId:(NSString *)appId
-                    configuration:(RLMAppConfiguration *)configuration
-                    rootDirectory:(NSURL *)rootDirectory {
-    REALM_ASSERT(appId.length);
-
-    [configuration setAppId:appId];
-    auto app = RLMTranslateError([&] {
-        return app::App::get_uncached_app(configuration.config,
-                                          [RLMSyncManager configurationWithRootDirectory:rootDirectory appId:appId]);
-    });
-    return [[RLMApp alloc] initWithApp:app];
-}
-
 + (instancetype)appWithId:(NSString *)appId configuration:(RLMAppConfiguration *)configuration {
     return [self appWithId:appId configuration:configuration rootDirectory:nil];
 }
 
 + (instancetype)appWithId:(NSString *)appId {
     return [self appWithId:appId configuration:nil];
-}
-
-- (NSString *)appId {
-    return @(_app->config().app_id.c_str());
 }
 
 - (std::shared_ptr<realm::app::App>)_realmApp {
@@ -373,9 +343,9 @@ static std::mutex& s_appMutex = *new std::mutex();
 
 - (void)loginWithCredential:(RLMCredentials *)credentials
                  completion:(RLMUserCompletionBlock)completionHandler {
-    auto completion = ^(std::shared_ptr<SyncUser> user, std::optional<app::AppError> error) {
-        if (error) {
-            return completionHandler(nil, makeError(*error));
+    auto completion = ^(std::shared_ptr<SyncUser> user, util::Optional<app::AppError> error) {
+        if (error && error->error_code) {
+            return completionHandler(nil, RLMAppErrorToNSError(*error));
         }
 
         completionHandler([[RLMUser alloc] initWithUser:user app:self], nil);
@@ -420,20 +390,26 @@ static std::mutex& s_appMutex = *new std::mutex();
            if (user) {
                [self.authorizationDelegate authenticationDidCompleteWithUser:user];
            } else {
-               [self.authorizationDelegate authenticationDidFailWithError:error];
+               [self.authorizationDelegate authenticationDidCompleteWithError:error];
            }
        }];
 }
 
 - (void)authorizationController:(__unused ASAuthorizationController *)controller
            didCompleteWithError:(NSError *)error API_AVAILABLE(ios(13.0), macos(10.15), tvos(13.0), watchos(6.0)) {
-    [self.authorizationDelegate authenticationDidFailWithError:error];
+    [self.authorizationDelegate authenticationDidCompleteWithError:error];
 }
 
 - (RLMAppSubscriptionToken *)subscribe:(RLMAppNotificationBlock)block {
-    return [[RLMAppSubscriptionToken alloc] initWithApp:_app token:_app->subscribe([block, self] (auto&) {
+    return [[RLMAppSubscriptionToken alloc] initWithToken:_app->subscribe([block, self] (auto&) {
         block(self);
     })];
 }
 
+- (void)unsubscribe:(RLMAppSubscriptionToken *)token {
+    return _app->unsubscribe(*token->_token);
+}
+
 @end
+
+

@@ -16,9 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#import <Realm/RLMConstants.h>
+#import <Foundation/Foundation.h>
 
-RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
+NS_ASSUME_NONNULL_BEGIN
 
 @class RLMSchema;
 @class RLMArray;
@@ -50,13 +50,13 @@ typedef void (^RLMObjectMigrationBlock)(RLMObject * __nullable oldObject, RLMObj
  Returns the old `RLMSchema`. This is the schema which describes the Realm before the
  migration is applied.
  */
-@property (nonatomic, readonly) RLMSchema *oldSchema NS_REFINED_FOR_SWIFT;
+@property (nonatomic, readonly) RLMSchema *oldSchema;
 
 /**
  Returns the new `RLMSchema`. This is the schema which describes the Realm after the
  migration is applied.
  */
-@property (nonatomic, readonly) RLMSchema *newSchema NS_REFINED_FOR_SWIFT;
+@property (nonatomic, readonly) RLMSchema *newSchema;
 
 
 #pragma mark - Altering Objects during a Migration
@@ -71,8 +71,7 @@ typedef void (^RLMObjectMigrationBlock)(RLMObject * __nullable oldObject, RLMObj
             to `className`. Instead, treat them as `RLMObject`s and use keyed subscripting to access
             properties.
  */
-- (void)enumerateObjects:(NSString *)className
-                   block:(__attribute__((noescape)) RLMObjectMigrationBlock)block NS_REFINED_FOR_SWIFT;
+- (void)enumerateObjects:(NSString *)className block:(__attribute__((noescape)) RLMObjectMigrationBlock)block;
 
 /**
  Creates and returns an `RLMObject` instance of type `className` in the Realm being migrated.
@@ -88,7 +87,7 @@ typedef void (^RLMObjectMigrationBlock)(RLMObject * __nullable oldObject, RLMObj
  @param className   The name of the `RLMObject` class to create.
  @param value       The value used to populate the object.
  */
-- (RLMObject *)createObject:(NSString *)className withValue:(id)value NS_REFINED_FOR_SWIFT;
+- (RLMObject *)createObject:(NSString *)className withValue:(id)value;
 
 /**
  Deletes an object from a Realm during a migration.
@@ -97,7 +96,7 @@ typedef void (^RLMObjectMigrationBlock)(RLMObject * __nullable oldObject, RLMObj
 
  @param object  Object to be deleted from the Realm being migrated.
  */
-- (void)deleteObject:(RLMObject *)object NS_REFINED_FOR_SWIFT;
+- (void)deleteObject:(RLMObject *)object;
 
 /**
  Deletes the data for the class with the given name.
@@ -109,21 +108,20 @@ typedef void (^RLMObjectMigrationBlock)(RLMObject * __nullable oldObject, RLMObj
 
  @return A Boolean value indicating whether there was any data to delete.
  */
-- (BOOL)deleteDataForClassName:(NSString *)name NS_REFINED_FOR_SWIFT;
+- (BOOL)deleteDataForClassName:(NSString *)name;
 
 /**
  Renames a property of the given class from `oldName` to `newName`.
 
  @param className The name of the class whose property should be renamed. This class must be present
                   in both the old and new Realm schemas.
- @param oldName   The old persisted property name for the property to be renamed. There must not be a property with this name in the
+ @param oldName   The old name for the property to be renamed. There must not be a property with this name in the
                   class as defined by the new Realm schema.
- @param newName   The new persisted property name for the property to be renamed. There must not be a property with this name in the
+ @param newName   The new name for the property to be renamed. There must not be a property with this name in the
                   class as defined by the old Realm schema.
  */
-- (void)renamePropertyForClass:(NSString *)className oldName:(NSString *)oldName
-                       newName:(NSString *)newName NS_REFINED_FOR_SWIFT;
+- (void)renamePropertyForClass:(NSString *)className oldName:(NSString *)oldName newName:(NSString *)newName;
 
 @end
 
-RLM_HEADER_AUDIT_END(nullability, sendability)
+NS_ASSUME_NONNULL_END

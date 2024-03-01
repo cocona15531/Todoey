@@ -40,7 +40,7 @@ using ref_type = size_t;
 namespace _impl {
 class RealmCoordinator;
 
-struct CollectionChangeInfo {
+struct ListChangeInfo {
     TableKey table_key;
     ObjKey obj_key;
     ColKey col_key;
@@ -48,8 +48,9 @@ struct CollectionChangeInfo {
 };
 
 struct TransactionChangeInfo {
-    std::vector<CollectionChangeInfo> collections;
+    std::vector<ListChangeInfo> lists;
     std::unordered_map<TableKey, ObjectChangeSet> tables;
+    bool track_all;
     bool schema_changed;
 };
 

@@ -17,12 +17,11 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #import "RLMSyncSubscription_Private.hpp"
-
-#import "RLMError_Private.hpp"
-#import "RLMObjectId_Private.hpp"
-#import "RLMQueryUtil.hpp"
 #import "RLMRealm_Private.hpp"
 #import "RLMUtil.hpp"
+#import "RLMQueryUtil.hpp"
+#import "RLMObjectId_Private.hpp"
+#import "RLMSyncUtil.h"
 
 #import <realm/sync/subscriptions.hpp>
 #import <realm/status_with.hpp>
@@ -48,31 +47,27 @@
 }
 
 - (RLMObjectId *)identifier {
-    return [[RLMObjectId alloc] initWithValue:_subscription->id];
+    return [[RLMObjectId alloc] initWithValue:_subscription->id()];
 }
 
 - (nullable NSString *)name {
-    auto name = _subscription->name;
-    if (name) {
-        return @(name->c_str());
-    }
-    return nil;
+    return RLMStringViewToNSString(_subscription->name());
 }
 
 - (NSDate *)createdAt {
-    return RLMTimestampToNSDate(_subscription->created_at);
+    return RLMTimestampToNSDate(_subscription->created_at());
 }
 
 - (NSDate *)updatedAt {
-    return RLMTimestampToNSDate(_subscription->updated_at);
+    return RLMTimestampToNSDate(_subscription->updated_at());
 }
 
 - (NSString *)queryString {
-    return @(_subscription->query_string.c_str());
+    return RLMStringViewToNSString(_subscription->query_string());
 }
 
 - (NSString *)objectClassName {
-    return @(_subscription->object_class_name.c_str());
+    return RLMStringViewToNSString(_subscription->object_class_name());
 }
 
 - (void)updateSubscriptionWhere:(NSString *)predicateFormat, ... {
@@ -212,9 +207,7 @@ NSUInteger RLMFastEnumerate(NSFastEnumerationState *state,
     if (errorMessage.length == 0) {
         return nil;
     }
-    return [[NSError alloc] initWithDomain:RLMSyncErrorDomain
-                                      code:RLMSyncErrorInvalidFlexibleSyncSubscriptions
-                                  userInfo:@{NSLocalizedDescriptionKey: errorMessage}];
+    return [[NSError alloc] initWithDomain:RLMFlexibleSyncErrorDomain code:RLMFlexibleSyncErrorStatusError userInfo:@{NSLocalizedDescriptionKey: errorMessage}];
 }
 
 - (RLMSyncSubscriptionState)state {
@@ -223,7 +216,6 @@ NSUInteger RLMFastEnumerate(NSFastEnumerationState *state,
         case realm::sync::SubscriptionSet::State::Uncommitted:
         case realm::sync::SubscriptionSet::State::Pending:
         case realm::sync::SubscriptionSet::State::Bootstrapping:
-        case realm::sync::SubscriptionSet::State::AwaitingMark:
             return RLMSyncSubscriptionStatePending;
         case realm::sync::SubscriptionSet::State::Complete:
             return RLMSyncSubscriptionStateComplete;
@@ -237,58 +229,56 @@ NSUInteger RLMFastEnumerate(NSFastEnumerationState *state,
 #pragma mark - Batch Update subscriptions
 
 - (void)update:(__attribute__((noescape)) void(^)(void))block {
-    return [self update:block onComplete:nil];
+    return [self update:block onComplete:^(NSError*){}];
 }
 
 - (void)update:(__attribute__((noescape)) void(^)(void))block onComplete:(void(^)(NSError *))completionBlock {
-    if (_mutableSubscriptionSet) {
-        @throw RLMException(@"Cannot initiate a write transaction on subscription set that is already being updated.");
+    if (_mutableSubscriptionSet != nil) {
+        @throw RLMException(@"Cannot initiate a write transaction on subscription set that is already been updated.");
     }
     _mutableSubscriptionSet = std::make_unique<realm::sync::MutableSubscriptionSet>(_subscriptionSet->make_mutable_copy());
-    realm::util::ScopeExit cleanup([&]() noexcept {
-        if (_mutableSubscriptionSet) {
-            _mutableSubscriptionSet = nullptr;
-            _subscriptionSet->refresh();
-        }
-    });
-
     block();
-
     try {
         _subscriptionSet = std::make_unique<realm::sync::SubscriptionSet>(std::move(*_mutableSubscriptionSet).commit());
         _mutableSubscriptionSet = nullptr;
     }
-    catch (realm::Exception const& ex) {
-        @throw RLMException(ex);
+    catch (const std::exception& error) {
+        _subscriptionSet->refresh();
+        NSError *err = [[NSError alloc] initWithDomain:RLMFlexibleSyncErrorDomain code:RLMFlexibleSyncErrorCommitSubscriptionSetError userInfo:@{@"reason":@(error.what())}];
+        return completionBlock(err);
     }
-    catch (std::exception const& ex) {
-        @throw RLMException(ex);
-    }
-
-    if (completionBlock) {
-        [self waitForSynchronizationOnQueue:nil completionBlock:completionBlock];
-    }
+    [self waitForSynchronizationOnQueue:nil completionBlock:completionBlock];
 }
 
 - (void)waitForSynchronizationOnQueue:(nullable dispatch_queue_t)queue
                       completionBlock:(void(^)(NSError *))completionBlock {
     _subscriptionSet->get_state_change_notification(realm::sync::SubscriptionSet::State::Complete)
-        .get_async([completionBlock, queue](realm::StatusWith<realm::sync::SubscriptionSet::State> state) noexcept {
+        .get_async([completionBlock, queue](realm::StatusWith<realm::sync::SubscriptionSet::State> state) mutable noexcept {
+            void (^block)(void) = ^{
+                if (state.is_ok()) {
+                    completionBlock(nil);
+                } else {
+                    NSError* error = [[NSError alloc] initWithDomain:RLMFlexibleSyncErrorDomain code:state.get_status().code() userInfo:@{@"reason": @(state.get_status().reason().c_str())}];
+                    completionBlock(error);
+                }
+            };
+
             if (queue) {
-                return dispatch_async(queue, ^{
-                    completionBlock(makeError(state));
+                dispatch_async(queue, ^{
+                    block();
                 });
+            } else {
+                block();
             }
-            return completionBlock(makeError(state));
         });
 }
 
 #pragma mark - Find subscription
 
 - (nullable RLMSyncSubscription *)subscriptionWithName:(NSString *)name {
-    auto subscription = _subscriptionSet->find([name UTF8String]);
-    if (subscription) {
-        return [[RLMSyncSubscription alloc] initWithSubscription:*subscription
+    auto iterator = _subscriptionSet->find([name UTF8String]);
+    if (iterator != _subscriptionSet->end()) {
+        return [[RLMSyncSubscription alloc] initWithSubscription:*iterator
                                                  subscriptionSet:self];
     }
     return nil;
@@ -315,9 +305,8 @@ NSUInteger RLMFastEnumerate(NSFastEnumerationState *state,
                                                   predicate:(NSPredicate *)predicate {
     RLMClassInfo& info = _realm->_info[objectClassName];
     auto query = RLMPredicateToQuery(predicate, info.rlmObjectSchema, _realm.schema, _realm.group);
-    auto subscription = _subscriptionSet->find(query);
-    if (subscription) {
-        return [[RLMSyncSubscription alloc] initWithSubscription:*subscription
+    if (auto it = _subscriptionSet->find(query); it != _subscriptionSet->end()) {
+        return [[RLMSyncSubscription alloc] initWithSubscription:*it
                                                  subscriptionSet:self];
     }
     return nil;
@@ -392,7 +381,7 @@ NSUInteger RLMFastEnumerate(NSFastEnumerationState *state,
     auto query = RLMPredicateToQuery(predicate, info.rlmObjectSchema, _realm.schema, _realm.group);
     
     if (name) {
-        if (updateExisting || !_mutableSubscriptionSet->find(name.UTF8String)) {
+        if (updateExisting || _mutableSubscriptionSet->find(name.UTF8String) == _mutableSubscriptionSet->end()) {
             _mutableSubscriptionSet->insert_or_assign(name.UTF8String, query);
         }
         else {
@@ -409,9 +398,9 @@ NSUInteger RLMFastEnumerate(NSFastEnumerationState *state,
 - (void)removeSubscriptionWithName:(NSString *)name {
     [self verifyInWriteTransaction];
 
-    auto subscription = _subscriptionSet->find([name UTF8String]);
-    if (subscription) {
-        _mutableSubscriptionSet->erase(subscription->name);
+    auto iterator = _mutableSubscriptionSet->find([name UTF8String]);
+    if (iterator != _mutableSubscriptionSet->end()) {
+        _mutableSubscriptionSet->erase(iterator);
     }
 }
 
@@ -438,9 +427,9 @@ NSUInteger RLMFastEnumerate(NSFastEnumerationState *state,
     
     RLMClassInfo& info = _realm->_info[objectClassName];
     auto query = RLMPredicateToQuery(predicate, info.rlmObjectSchema, _realm.schema, _realm.group);
-    auto subscription = _subscriptionSet->find(query);
-    if (subscription) {
-        _mutableSubscriptionSet->erase(query);
+    auto iterator = _mutableSubscriptionSet->find(query);
+    if (iterator != _mutableSubscriptionSet->end()) {
+        _mutableSubscriptionSet->erase(iterator);
     }
 }
 
@@ -448,7 +437,7 @@ NSUInteger RLMFastEnumerate(NSFastEnumerationState *state,
     [self verifyInWriteTransaction];
 
     for (auto it = _mutableSubscriptionSet->begin(); it != _mutableSubscriptionSet->end();) {
-        if (it->id == subscription.identifier.value) {
+        if (it->id() == subscription.identifier.value) {
             it = _mutableSubscriptionSet->erase(it);
             return;
         }
@@ -467,7 +456,7 @@ NSUInteger RLMFastEnumerate(NSFastEnumerationState *state,
     [self verifyInWriteTransaction];
     
     for (auto it = _mutableSubscriptionSet->begin(); it != _mutableSubscriptionSet->end();) {
-        if (it->object_class_name == [className UTF8String]) {
+        if (it->object_class_name() == [className UTF8String]) {
             it = _mutableSubscriptionSet->erase(it);
         }
         else {

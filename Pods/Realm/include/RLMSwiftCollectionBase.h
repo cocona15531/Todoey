@@ -20,7 +20,7 @@
 
 @class RLMObjectBase, RLMResults, RLMProperty, RLMLinkingObjects;
 
-RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
+NS_ASSUME_NONNULL_BEGIN
 
 @interface RLMSwiftCollectionBase : NSProxy <NSFastEnumeration>
 @property (nonatomic, strong) id<RLMCollection> _rlmCollection;
@@ -43,4 +43,4 @@ RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
 @property (nonatomic, readonly) BOOL _isLegacyProperty;
 @end
 
-RLM_HEADER_AUDIT_END(nullability, sendability)
+NS_ASSUME_NONNULL_END

@@ -16,10 +16,12 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#import <Foundation/Foundation.h>
+
 #import <Realm/RLMObjectBase.h>
 #import <Realm/RLMThreadSafeReference.h>
 
-RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
+NS_ASSUME_NONNULL_BEGIN
 
 @class RLMObjectSchema, RLMPropertyDescriptor, RLMRealm, RLMNotificationToken, RLMPropertyChange;
 typedef void (^RLMObjectChangeBlock)(BOOL deleted,
@@ -268,7 +270,7 @@ typedef void (^RLMObjectChangeBlock)(BOOL deleted,
  @warning The queue must be a serial queue.
 
  @param block The block to be called whenever a change occurs.
- @param keyPaths The block will be called for changes occurring on these keypaths. If no
+ @param keyPaths The block will be called for changes occuring on these keypaths. If no
  key paths are given, notifications are delivered for every property key path.
  @param queue The serial queue to deliver notifications to.
  @return A token which must be held for as long as you want updates to be delivered.
@@ -308,7 +310,7 @@ typedef void (^RLMObjectChangeBlock)(BOOL deleted,
  @warning The queue must be a serial queue.
 
  @param block The block to be called whenever a change occurs.
- @param keyPaths The block will be called for changes occurring on these keypaths. If no
+ @param keyPaths The block will be called for changes occuring on these keypaths. If no
  key paths are given, notifications are delivered for every property key path.
  @return A token which must be held for as long as you want updates to be delivered.
  */
@@ -364,4 +366,4 @@ typedef void (^RLMObjectChangeBlock)(BOOL deleted,
 
 @end
 
-RLM_HEADER_AUDIT_END(nullability, sendability)
+NS_ASSUME_NONNULL_END

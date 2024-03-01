@@ -27,7 +27,8 @@ namespace realm {
 template <class cond, class Callback>
 bool ArrayInteger::find(value_type value, size_t start, size_t end, QueryStateBase* state, Callback callback) const
 {
-    return ArrayWithFind(*this).find<cond, Callback>(value, start, end, 0, state, callback);
+    const Array* arr = this;
+    return static_cast<const ArrayWithFind*>(arr)->find<cond, Callback>(value, start, end, 0, state, callback);
 }
 
 template <class Callback>
@@ -79,7 +80,8 @@ bool ArrayIntNull::find_impl(value_type opt_value, size_t start, size_t end, Que
         }
 
         // Fall back to plain Array find.
-        return ArrayWithFind(*this).find<cond>(value, start2, end2, baseindex2, state, callback);
+        const Array* arr = this;
+        return static_cast<const ArrayWithFind*>(arr)->find<cond>(value, start2, end2, baseindex2, state, callback);
     }
     else {
         cond c;
@@ -96,7 +98,8 @@ bool ArrayIntNull::find_impl(value_type opt_value, size_t start, size_t end, Que
             bool value_is_null = (v == null_value);
             if (c(v, value, value_is_null, find_null)) {
                 util::Optional<int64_t> v2 = value_is_null ? util::none : util::make_optional(v);
-                if (!ArrayWithFind(*this).find_action(i + baseindex2, v2, state, callback)) {
+                const Array* arr = this;
+                if (!static_cast<const ArrayWithFind*>(arr)->find_action(i + baseindex2, v2, state, callback)) {
                     return false; // tell caller to stop aggregating/search
                 }
             }

@@ -104,6 +104,7 @@ extension Object: _RealmCollectionValueInsideOptional {
         RLMInitializeWithValue(self, value, .partialPrivateShared())
     }
 
+
     // MARK: Properties
 
     /// The Realm which manages the object, or `nil` if the object is unmanaged.
@@ -177,56 +178,6 @@ extension Object: _RealmCollectionValueInsideOptional {
      - returns: An array of property names.
      */
     @objc open class func indexedProperties() -> [String] { return [] }
-
-    /**
-     Override this method to specify a map of public-private property names.
-     This will set a different persisted property name on the Realm, and allows using the public name
-     for any operation with the property. (Ex: Queries, Sorting, ...).
-     This very helpful if you need to map property names from your `Device Sync` JSON schema
-     to local property names.
-
-     ```swift
-     class Person: Object {
-         @Persisted var firstName: String
-         @Persisted var birthDate: Date
-         @Persisted var age: Int
-
-         override class public func propertiesMapping() -> [String : String] {
-             ["firstName": "first_name",
-              "birthDate": "birth_date"]
-         }
-     }
-     ```
-
-     - note: Only property that have a different column name have to be added to the properties mapping
-     dictionary.
-     - note: In a migration block, when enumerating an old property with a public/private name, you will have to use
-     the old column name instead of the public one to retrieve the property value.
-
-     ```swift
-     let migrationBlock = { migration, oldSchemaVersion in
-         migration.enumerateObjects(ofType: "Person", { oldObj, newObj in
-            let oldPropertyValue = oldObj!["first_name"] as! String
-            // Use this value in migration
-         })
-     }
-     ```
-     This has to be done as well when renaming a property.
-     ```swift
-     let migrationBlock = { migration, oldSchemaVersion in
-         migration.renameProperty(onType: "Person", from: "first_name", to: "complete_name")
-     }
-     ```
-
-
-
-     - returns: A dictionary of public-private property names.
-     */
-    @objc open override class func propertiesMapping() -> [String: String] { return [:] }
-
-    /// :nodoc:
-    @available(*, unavailable, renamed: "propertiesMapping", message: "`_realmColumnNames` private API is unavailable in our Swift SDK, please use the override `.propertiesMapping()` instead.")
-    @objc open override class func _realmColumnNames() -> [String: String] { return [:] }
 
     // MARK: Key-Value Coding & Subscripting
 
@@ -321,7 +272,7 @@ extension Object: _RealmCollectionValueInsideOptional {
     public func observe<T: RLMObjectBase>(keyPaths: [String]? = nil,
                                           on queue: DispatchQueue? = nil,
                                           _ block: @escaping (ObjectChange<T>) -> Void) -> NotificationToken {
-        _observe(keyPaths: keyPaths, on: queue, block)
+        return _observe(keyPaths: keyPaths, on: queue, block)
     }
 
     /**
@@ -401,96 +352,8 @@ extension Object: _RealmCollectionValueInsideOptional {
     public func observe<T: ObjectBase>(keyPaths: [PartialKeyPath<T>],
                                        on queue: DispatchQueue? = nil,
                                        _ block: @escaping (ObjectChange<T>) -> Void) -> NotificationToken {
-        _observe(keyPaths: keyPaths.map(_name(for:)), on: queue, block)
+        return _observe(keyPaths: keyPaths.map(_name(for:)), on: queue, block)
     }
-
-#if swift(>=5.8)
-    /**
-    Registers a block to be called each time the object changes.
-
-    The block will be asynchronously called on the given actor's executor after
-    each write transaction which deletes the object or modifies any of the managed
-    properties of the object, including self-assignments that set a property to its
-    existing value. The block is passed a copy of the object isolated to the
-    requested actor which can be safely used on that actor along with information
-    about what changed.
-
-    For write transactions performed on different threads or in different
-    processes, the block will be called when the managing Realm is
-    (auto)refreshed to a version including the changes, while for local write
-    transactions it will be called at some point in the future after the write
-    transaction is committed.
-
-    Only objects which are managed by a Realm can be observed in this way. You
-    must retain the returned token for as long as you want updates to be sent
-    to the block. To stop receiving updates, call `invalidate()` on the token.
-
-    By default, only direct changes to the object's properties will produce
-    notifications, and not changes to linked objects. Note that this is different
-    from collection change notifications. If a non-nil, non-empty keypath array is
-    passed in, only changes to the properties identified by those keypaths will
-    produce change notifications. The keypaths may traverse link properties to
-    receive information about changes to linked objects.
-
-    - warning: This method cannot be called during a write transaction, or when
-    the containing Realm is read-only.
-    - parameter actor: The actor to isolate notifications to.
-    - parameter block: The block to call with information about changes to the object.
-    - returns: A token which must be held for as long as you want updates to be delivered.
-     */
-    @available(macOS 10.15, tvOS 13.0, iOS 13.0, watchOS 6.0, *)
-    @_unsafeInheritExecutor
-    public func observe<A: Actor, T: Object>(
-        keyPaths: [String]? = nil, on actor: A,
-        _ block: @Sendable @escaping (isolated A, ObjectChange<T>) -> Void
-    ) async -> NotificationToken {
-        await with(self, on: actor) { actor, obj in
-            await obj._observe(keyPaths: keyPaths, on: actor, block)
-        } ?? NotificationToken()
-    }
-
-    /**
-    Registers a block to be called each time the object changes.
-
-    The block will be asynchronously called on the given actor's executor after
-    each write transaction which deletes the object or modifies any of the managed
-    properties of the object, including self-assignments that set a property to its
-    existing value. The block is passed a copy of the object isolated to the
-    requested actor which can be safely used on that actor along with information
-    about what changed.
-
-    For write transactions performed on different threads or in different
-    processes, the block will be called when the managing Realm is
-    (auto)refreshed to a version including the changes, while for local write
-    transactions it will be called at some point in the future after the write
-    transaction is committed.
-
-    Only objects which are managed by a Realm can be observed in this way. You
-    must retain the returned token for as long as you want updates to be sent
-    to the block. To stop receiving updates, call `invalidate()` on the token.
-
-    By default, only direct changes to the object's properties will produce
-    notifications, and not changes to linked objects. Note that this is different
-    from collection change notifications. If a non-nil, non-empty keypath array is
-    passed in, only changes to the properties identified by those keypaths will
-    produce change notifications. The keypaths may traverse link properties to
-    receive information about changes to linked objects.
-
-    - warning: This method cannot be called during a write transaction, or when
-    the containing Realm is read-only.
-    - parameter actor: The actor to isolate notifications to.
-    - parameter block: The block to call with information about changes to the object.
-    - returns: A token which must be held for as long as you want updates to be delivered.
-     */
-    @available(macOS 10.15, tvOS 13.0, iOS 13.0, watchOS 6.0, *)
-    @_unsafeInheritExecutor
-    public func observe<A: Actor, T: Object>(
-        keyPaths: [PartialKeyPath<T>], on actor: A,
-        _ block: @Sendable @escaping (isolated A, ObjectChange<T>) -> Void
-    ) async -> NotificationToken {
-        await observe(keyPaths: keyPaths.map(_name(for:)), on: actor, block)
-    }
-#endif // swift(>=5.8)
 
     // MARK: Dynamic list
 
@@ -655,8 +518,11 @@ extension Object: ThreadConfined {
  */
 @frozen public enum ObjectChange<T> {
     /**
-     Errors can no longer occur. This case is unused and will be removed in the
-     next major version.
+     If an error occurs, notification blocks are called one time with a `.error`
+     result and an `NSError` containing details about the error. Currently the
+     only errors which can occur are when opening the Realm on a background
+     worker thread to calculate the change set. The callback will never be
+     called again after `.error` is delivered.
      */
     case error(_ error: NSError)
     /**
@@ -665,17 +531,6 @@ extension Object: ThreadConfined {
     case change(_: T, _: [PropertyChange])
     /// The object has been deleted from the Realm.
     case deleted
-
-    internal init(object: T?, names: [String]?, oldValues: [Any]?, newValues: [Any]?) {
-        guard let names = names, let newValues = newValues, let object = object else {
-            self = .deleted
-            return
-        }
-
-        self = .change(object, (0..<newValues.count).map { i in
-            PropertyChange(name: names[i], oldValue: oldValues?[i], newValue: newValues[i])
-        })
-    }
 }
 
 /// Object interface which allows untyped getters and setters for Objects.

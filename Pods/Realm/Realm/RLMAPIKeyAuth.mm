@@ -23,23 +23,23 @@
 #import "RLMUserAPIKey_Private.hpp"
 #import "RLMObjectId_Private.hpp"
 
-using namespace realm::app;
-
 @implementation RLMAPIKeyAuth
 
-- (App::UserAPIKeyProviderClient)client {
-    return self.app._realmApp->provider_client<App::UserAPIKeyProviderClient>();
+- (realm::app::App::UserAPIKeyProviderClient)client {
+    return self.app._realmApp->provider_client<realm::app::App::UserAPIKeyProviderClient>();
 }
 
 - (std::shared_ptr<realm::SyncUser>)currentUser {
     return self.app._realmApp->current_user();
 }
 
-static realm::util::UniqueFunction<void(App::UserAPIKey, std::optional<AppError>)>
-wrapCompletion(RLMOptionalUserAPIKeyBlock completion) {
-    return [completion](App::UserAPIKey userAPIKey, std::optional<AppError> error) {
-        if (error) {
-            return completion(nil, makeError(*error));
+static std::function<void(realm::app::App::UserAPIKey,
+                          realm::util::Optional<realm::app::AppError>)>
+wrapAPIKeyCompletion(RLMOptionalUserAPIKeyBlock completion) {
+    return [completion](realm::app::App::UserAPIKey userAPIKey,
+             realm::util::Optional<realm::app::AppError> error) {
+        if (error && error->error_code) {
+            return completion(nil, RLMAppErrorToNSError(*error));
         }
         return completion([[RLMUserAPIKey alloc] initWithUserAPIKey:userAPIKey], nil);
     };
@@ -47,24 +47,26 @@ wrapCompletion(RLMOptionalUserAPIKeyBlock completion) {
 
 - (void)createAPIKeyWithName:(NSString *)name
                   completion:(RLMOptionalUserAPIKeyBlock)completion {
-    self.client.create_api_key(name.UTF8String, self.currentUser, wrapCompletion(completion));
+    self.client.create_api_key(name.UTF8String, self.currentUser,
+                               wrapAPIKeyCompletion(completion));
 }
 
 - (void)fetchAPIKey:(RLMObjectId *)objectId
          completion:(RLMOptionalUserAPIKeyBlock)completion {
-    self.client.fetch_api_key(objectId.value, self.currentUser, wrapCompletion(completion));
+    self.client.fetch_api_key(objectId.value, self.currentUser,
+                               wrapAPIKeyCompletion(completion));
 }
 
 - (void)fetchAPIKeysWithCompletion:(RLMUserAPIKeysBlock)completion {
     self.client.fetch_api_keys(self.currentUser,
-                               ^(const std::vector<App::UserAPIKey>& userAPIKeys,
-                                 std::optional<AppError> error) {
-        if (error) {
-            return completion(nil, makeError(*error));
+                               ^(const std::vector<realm::app::App::UserAPIKey>& userAPIKeys,
+                                 realm::util::Optional<realm::app::AppError> error) {
+        if (error && error->error_code) {
+            return completion(nil, RLMAppErrorToNSError(*error));
         }
         
         NSMutableArray *apiKeys = [[NSMutableArray alloc] init];
-        for (auto &userAPIKey : userAPIKeys) {
+        for(auto &userAPIKey : userAPIKeys) {
             [apiKeys addObject:[[RLMUserAPIKey alloc] initWithUserAPIKey:userAPIKey]];
         }
         
@@ -74,17 +76,20 @@ wrapCompletion(RLMOptionalUserAPIKeyBlock completion) {
 
 - (void)deleteAPIKey:(RLMObjectId *)objectId
           completion:(RLMAPIKeyAuthOptionalErrorBlock)completion {
-    self.client.delete_api_key(objectId.value, self.currentUser, RLMWrapCompletion(completion));
+    self.client.delete_api_key(objectId.value, self.currentUser,
+                               RLMWrapCompletion(completion));
 }
 
 - (void)enableAPIKey:(RLMObjectId *)objectId
           completion:(RLMAPIKeyAuthOptionalErrorBlock)completion {
-    self.client.enable_api_key(objectId.value, self.currentUser, RLMWrapCompletion(completion));
+    self.client.enable_api_key(objectId.value, self.currentUser,
+                               RLMWrapCompletion(completion));
 }
 
 - (void)disableAPIKey:(RLMObjectId *)objectId
            completion:(RLMAPIKeyAuthOptionalErrorBlock)completion {
-    self.client.disable_api_key(objectId.value, self.currentUser, RLMWrapCompletion(completion));
+    self.client.disable_api_key(objectId.value, self.currentUser,
+                                RLMWrapCompletion(completion));
 }
 
 @end

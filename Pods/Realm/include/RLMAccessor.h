@@ -16,11 +16,11 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#import <Realm/RLMConstants.h>
+#import <Foundation/Foundation.h>
 
 @class RLMObjectSchema, RLMProperty, RLMObjectBase;
 
-RLM_HEADER_AUDIT_BEGIN(nullability)
+NS_ASSUME_NONNULL_BEGIN
 
 //
 // Accessors Class Creation/Caching
@@ -50,4 +50,4 @@ void RLMReplaceClassNameMethod(Class accessorClass, NSString *className);
 // Replace sharedSchema method for the given class
 void RLMReplaceSharedSchemaMethod(Class accessorClass, RLMObjectSchema * __nullable schema);
 
-RLM_HEADER_AUDIT_END(nullability)
+NS_ASSUME_NONNULL_END

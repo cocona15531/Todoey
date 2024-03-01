@@ -220,7 +220,7 @@ import Combine
      - parameter onComplete: The block called upon synchronization of subscriptions to the server. Otherwise
                              an `Error`describing what went wrong will be returned by the block
      */
-    public func update(_ block: (() -> Void), onComplete: (@Sendable (Error?) -> Void)? = nil) {
+    public func update(_ block: (() -> Void), onComplete: ((Error?) -> Void)? = nil) {
         rlmSyncSubscriptionSet.update(block, onComplete: onComplete ?? { _ in })
     }
 
@@ -452,8 +452,8 @@ extension SyncSubscriptionSet: Sequence {
     }
 }
 
-#if canImport(_Concurrency)
-@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+#if swift(>=5.6) && canImport(_Concurrency)
+@available(macOS 10.15, tvOS 13.0, iOS 13.0, watchOS 6.0, *)
 extension SyncSubscriptionSet {
     /**
      Creates and commits a transaction, updating the subscription set,
@@ -466,7 +466,15 @@ extension SyncSubscriptionSet {
      */
     @MainActor
     public func update(_ block: (() -> Void)) async throws {
-        try await rlmSyncSubscriptionSet.update(block)
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            update(block) { error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume()
+                }
+            }
+        }
     }
 
     /// :nodoc:
@@ -489,8 +497,14 @@ extension SyncSubscriptionSet {
      - returns: A publisher that eventually returns `Result.success` or `Error`.
      */
     public func updateSubscriptions(_ block: @escaping (() -> Void)) -> Future<Void, Error> {
-        promisify {
-            update(block, onComplete: $0)
+        return Future<Void, Error> { promise in
+            update(block) { error in
+                if let error = error {
+                    promise(.failure(error))
+                } else {
+                    promise(.success(()))
+                }
+            }
         }
     }
 }

@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#import <Realm/RLMConstants.h>
+#import <Foundation/Foundation.h>
 
 #import <realm/table_ref.hpp>
 #import <realm/util/optional.hpp>
@@ -35,7 +35,7 @@ namespace realm {
 class RLMObservationInfo;
 @class RLMRealm, RLMSchema, RLMObjectSchema, RLMProperty;
 
-RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
+NS_ASSUME_NONNULL_BEGIN
 
 namespace std {
 // Add specializations so that NSString can be used as the key for hash containers
@@ -107,13 +107,6 @@ public:
     // Returns true if this was a dynamically added type
     bool isDynamic() const noexcept;
 
-    // KeyPathFromString converts a string keypath to a vector of key
-    // pairs to be used for deep change checking across links.
-    // NEXT-MAJOR: This conflates a nil array and an empty array for backwards
-    // compatibility, but core now gives them different semantics
-    std::optional<std::vector<std::vector<std::pair<realm::TableKey, realm::ColKey>>>>
-    keyPathArrayFromStringArray(NSArray<NSString *> *keyPaths) const;
-
 private:
     // If the ObjectSchema is not owned by the realm instance
     // we need to manually manage the ownership of the object.
@@ -152,4 +145,4 @@ private:
     std::unordered_map<NSString *, RLMClassInfo> m_objects;
 };
 
-RLM_HEADER_AUDIT_END(nullability, sendability)
+NS_ASSUME_NONNULL_END

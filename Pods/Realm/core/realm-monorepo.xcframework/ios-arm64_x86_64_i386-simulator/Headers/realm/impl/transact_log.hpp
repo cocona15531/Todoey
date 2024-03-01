@@ -27,6 +27,9 @@
 #include <realm/util/buffer.hpp>
 #include <realm/util/input_stream.hpp>
 
+#include <stdexcept>
+#include <tuple>
+
 namespace realm {
 
 struct GlobalKey;
@@ -52,24 +55,23 @@ enum Instruction {
     instr_RenameColumn = 22, // Rename column in selected descriptor
     // instr_SetLinkType = 23,  Strong/weak (unused from file format 11)
 
-    instr_SelectCollection = 30,
-    instr_CollectionInsert = 31, // Insert collection entry
-    instr_CollectionSet = 32,    // Assign to collection entry
-    instr_CollectionMove = 33,   // Move an entry within an ordered collection
+    instr_SelectList = 30,
+    instr_ListInsert = 31, // Insert list entry
+    instr_ListSet = 32,    // Assign to list entry
+    instr_ListMove = 33,   // Move an entry within a link list
     // instr_ListSwap = 34,   Swap two entries within a list (unused from file format 11)
-    instr_CollectionErase = 35, // Remove an entry from a collection
-    instr_CollectionClear = 36, // Remove all entries from a collection
+    instr_ListErase = 35, // Remove an entry from a list
+    instr_ListClear = 36, // Remove all entries from a list
 
-    // No longer emitted, but supported for a file shared with an older version.
-    // Treated identically to the Collection versions.
     instr_DictionaryInsert = 37,
     instr_DictionarySet = 38,
     instr_DictionaryErase = 39,
-    instr_SetInsert = 40,
-    instr_SetErase = 41,
-    instr_SetClear = 42,
 
-    // An action involving TypedLinks has occurred which caused
+    instr_SetInsert = 40, // Insert value into set
+    instr_SetErase = 41,  // Erase value from set
+    instr_SetClear = 42,  // Remove all values in a set
+
+    // An action involving TypedLinks has occured which caused
     // the number of backlink columns to change. This can happen
     // when a TypedLink is created for the first time to a Table.
     instr_TypedLinkChange = 43,
@@ -131,6 +133,10 @@ public:
     {
         return true;
     }
+    bool select_link_list(ColKey, ObjKey)
+    {
+        return true;
+    }
     bool insert_group_level_table(TableKey)
     {
         return true;
@@ -140,10 +146,6 @@ public:
         return true;
     }
     bool rename_class(TableKey)
-    {
-        return true;
-    }
-    bool typed_link_change(ColKey, TableKey)
     {
         return true;
     }
@@ -158,6 +160,27 @@ public:
         return true;
     }
     bool modify_object(ColKey, ObjKey)
+    {
+        return true;
+    }
+    bool list_set(size_t)
+    {
+        return true;
+    }
+    bool list_insert(size_t)
+    {
+        return true;
+    }
+
+    bool dictionary_insert(size_t, Mixed)
+    {
+        return true;
+    }
+    bool dictionary_set(size_t, Mixed)
+    {
+        return true;
+    }
+    bool dictionary_erase(size_t, Mixed)
     {
         return true;
     }
@@ -180,24 +203,34 @@ public:
         return true;
     }
 
-    // Must have collection selected:
-    bool collection_set(size_t)
+    // Must have linklist selected:
+    bool list_move(size_t, size_t)
     {
         return true;
     }
-    bool collection_insert(size_t)
+    bool list_erase(size_t)
     {
         return true;
     }
-    bool collection_move(size_t, size_t)
+    bool list_clear(size_t)
     {
         return true;
     }
-    bool collection_erase(size_t)
+
+    bool set_insert(size_t)
     {
         return true;
     }
-    bool collection_clear(size_t)
+    bool set_erase(size_t)
+    {
+        return true;
+    }
+    bool set_clear(size_t)
+    {
+        return true;
+    }
+
+    bool typed_link_change(ColKey, TableKey)
     {
         return true;
     }
@@ -242,11 +275,20 @@ public:
 
     // Must have collection selected:
     bool select_collection(ColKey col_key, ObjKey key);
-    bool collection_set(size_t collection_ndx);
-    bool collection_insert(size_t ndx);
-    bool collection_move(size_t from_ndx, size_t to_ndx);
-    bool collection_erase(size_t collection_ndx);
-    bool collection_clear(size_t old_size);
+    bool list_set(size_t list_ndx);
+    bool list_insert(size_t ndx);
+    bool list_move(size_t from_link_ndx, size_t to_link_ndx);
+    bool list_erase(size_t list_ndx);
+    bool list_clear(size_t old_list_size);
+
+    // Must have set selected:
+    bool set_insert(size_t set_ndx);
+    bool set_erase(size_t set_ndx);
+    bool set_clear(size_t set_ndx);
+
+    bool dictionary_insert(size_t dict_ndx, Mixed key);
+    bool dictionary_set(size_t dict_ndx, Mixed key);
+    bool dictionary_erase(size_t dict_ndx, Mixed key);
 
     bool typed_link_change(ColKey col, TableKey dest);
 
@@ -327,16 +369,24 @@ private:
 
 class TransactLogParser {
 public:
+    class BadTransactLog; // Exception
+
+    TransactLogParser();
+    ~TransactLogParser() noexcept;
+
     /// See `TransactLogEncoder` for a list of methods that the `InstructionHandler` must define.
     template <class InstructionHandler>
     void parse(util::InputStream&, InstructionHandler&);
 
+    template <class InstructionHandler>
+    void parse(util::NoCopyInputStream&, InstructionHandler&);
+
 private:
-    util::Buffer<char> m_input_buffer{1024};
+    util::Buffer<char> m_input_buffer;
 
     // The input stream is assumed to consist of chunks of memory organised such that
     // every instruction resides in a single chunk only.
-    util::InputStream* m_input;
+    util::NoCopyInputStream* m_input;
     // pointer into transaction log, each instruction is parsed from m_input_begin and onwards.
     // Each instruction are assumed to be contiguous in memory.
     const char* m_input_begin;
@@ -347,7 +397,7 @@ private:
     const char* m_input_end;
     std::string m_string_buffer;
 
-    REALM_COLD REALM_NORETURN void parser_error() const;
+    REALM_NORETURN void parser_error() const;
 
     template <class InstructionHandler>
     void parse_one(InstructionHandler&);
@@ -367,6 +417,15 @@ private:
 
     // return true if input was available
     bool read_char(char&); // throws
+};
+
+
+class TransactLogParser::BadTransactLog : public std::exception {
+public:
+    const char* what() const noexcept override
+    {
+        return "Bad transaction log";
+    }
 };
 
 
@@ -618,40 +677,64 @@ inline bool TransactLogEncoder::modify_object(ColKey col_key, ObjKey key)
 }
 
 
-/************************************ Collections ***********************************/
 
-inline bool TransactLogEncoder::collection_set(size_t ndx)
+/************************************ List ***********************************/
+
+inline bool TransactLogEncoder::list_set(size_t list_ndx)
 {
-    append_simple_instr(instr_CollectionSet, ndx); // Throws
+    append_simple_instr(instr_ListSet, list_ndx); // Throws
     return true;
 }
 
-inline bool TransactLogEncoder::collection_insert(size_t ndx)
+inline bool TransactLogEncoder::list_insert(size_t list_ndx)
 {
-    append_simple_instr(instr_CollectionInsert, ndx); // Throws
+    append_simple_instr(instr_ListInsert, list_ndx); // Throws
     return true;
 }
 
 
-inline bool TransactLogEncoder::collection_move(size_t from_ndx, size_t to_ndx)
+/************************************ Set ************************************/
+
+inline bool TransactLogEncoder::set_insert(size_t set_ndx)
+{
+    append_simple_instr(instr_SetInsert, set_ndx); // Throws
+    return true;
+}
+
+
+inline bool TransactLogEncoder::set_erase(size_t set_ndx)
+{
+    append_simple_instr(instr_SetErase, set_ndx); // Throws
+    return true;
+}
+
+
+inline bool TransactLogEncoder::set_clear(size_t set_size)
+{
+    append_simple_instr(instr_SetClear, set_size); // Throws
+    return true;
+}
+
+
+inline bool TransactLogEncoder::list_move(size_t from_link_ndx, size_t to_link_ndx)
 {
     // This test is to prevent some fuzzy testing on the server to crash
-    if (from_ndx != to_ndx) {
-        append_simple_instr(instr_CollectionMove, from_ndx, to_ndx); // Throws
+    if (from_link_ndx != to_link_ndx) {
+        append_simple_instr(instr_ListMove, from_link_ndx, to_link_ndx); // Throws
     }
     return true;
 }
 
-inline bool TransactLogEncoder::collection_erase(size_t ndx)
+inline bool TransactLogEncoder::list_erase(size_t list_ndx)
 {
-    append_simple_instr(instr_CollectionErase, ndx); // Throws
+    append_simple_instr(instr_ListErase, list_ndx); // Throws
     return true;
 }
 
 
-inline bool TransactLogEncoder::collection_clear(size_t old_size)
+inline bool TransactLogEncoder::list_clear(size_t old_list_size)
 {
-    append_simple_instr(instr_CollectionClear, old_size); // Throws
+    append_simple_instr(instr_ListClear, old_list_size); // Throws
     return true;
 }
 
@@ -662,14 +745,30 @@ inline bool TransactLogEncoder::typed_link_change(ColKey col, TableKey dest)
 }
 
 
+inline TransactLogParser::TransactLogParser()
+    : m_input_buffer(1024) // Throws
+{
+}
+
+
+inline TransactLogParser::~TransactLogParser() noexcept {}
+
+
 template <class InstructionHandler>
-void TransactLogParser::parse(util::InputStream& in, InstructionHandler& handler)
+void TransactLogParser::parse(util::NoCopyInputStream& in, InstructionHandler& handler)
 {
     m_input = &in;
     m_input_begin = m_input_end = nullptr;
 
     while (has_next())
         parse_one(handler); // Throws
+}
+
+template <class InstructionHandler>
+void TransactLogParser::parse(util::InputStream& in, InstructionHandler& handler)
+{
+    util::NoCopyInputStreamAdaptor in_2(in, m_input_buffer);
+    parse(in_2, handler); // Throws
 }
 
 inline bool TransactLogParser::has_next() noexcept
@@ -695,6 +794,12 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         case instr_SetDefault:
             // Should not appear in the transaction log
             parser_error();
+        case instr_ListSet: {
+            size_t list_ndx = read_int<size_t>();
+            if (!handler.list_set(list_ndx)) // Throws
+                parser_error();
+            return;
+        }
         case instr_CreateObject: {
             ObjKey key(read_int<int64_t>()); // Throws
             if (!handler.create_object(key)) // Throws
@@ -715,68 +820,77 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             return;
         }
-        case instr_CollectionSet: {
-            size_t ndx = read_int<size_t>();
-            if (!handler.collection_set(ndx)) // Throws
+        case instr_ListInsert: {
+            size_t list_ndx = read_int<size_t>();
+            if (!handler.list_insert(list_ndx)) // Throws
                 parser_error();
             return;
         }
-        case instr_SetInsert:
-        case instr_CollectionInsert: {
-            size_t ndx = read_int<size_t>();
-            if (!handler.collection_insert(ndx)) // Throws
+        case instr_ListMove: {
+            size_t from_link_ndx = read_int<size_t>();          // Throws
+            size_t to_link_ndx = read_int<size_t>();            // Throws
+            if (!handler.list_move(from_link_ndx, to_link_ndx)) // Throws
                 parser_error();
             return;
         }
-        case instr_CollectionMove: {
-            size_t from_ndx = read_int<size_t>();           // Throws
-            size_t to_ndx = read_int<size_t>();             // Throws
-            if (!handler.collection_move(from_ndx, to_ndx)) // Throws
+        case instr_ListErase: {
+            size_t link_ndx = read_int<size_t>(); // Throws
+            if (!handler.list_erase(link_ndx))    // Throws
                 parser_error();
             return;
         }
-        case instr_SetErase:
-        case instr_CollectionErase: {
-            size_t ndx = read_int<size_t>();    // Throws
-            if (!handler.collection_erase(ndx)) // Throws
-                parser_error();
-            return;
-        }
-        case instr_SetClear:
-        case instr_CollectionClear: {
-            size_t old_size = read_int<size_t>();    // Throws
-            if (!handler.collection_clear(old_size)) // Throws
+        case instr_ListClear: {
+            size_t old_list_size = read_int<size_t>(); // Throws
+            if (!handler.list_clear(old_list_size))    // Throws
                 parser_error();
             return;
         }
         case instr_DictionaryInsert: {
             int type = read_int<int>(); // Throws
             REALM_ASSERT(type == int(type_String));
-            read_string(m_string_buffer);             // skip key
-            size_t dict_ndx = read_int<size_t>();     // Throws
-            if (!handler.collection_insert(dict_ndx)) // Throws
+            Mixed key = Mixed(read_string(m_string_buffer));
+            size_t dict_ndx = read_int<size_t>();          // Throws
+            if (!handler.dictionary_insert(dict_ndx, key)) // Throws
                 parser_error();
             return;
         }
         case instr_DictionarySet: {
             int type = read_int<int>(); // Throws
             REALM_ASSERT(type == int(type_String));
-            read_string(m_string_buffer);               // skip key
+            Mixed key = Mixed(read_string(m_string_buffer));
             size_t dict_ndx = read_int<size_t>();       // Throws
-            if (!handler.collection_set(dict_ndx))      // Throws
+            if (!handler.dictionary_set(dict_ndx, key)) // Throws
                 parser_error();
             return;
         }
         case instr_DictionaryErase: {
             int type = read_int<int>(); // Throws
             REALM_ASSERT(type == int(type_String));
-            read_string(m_string_buffer);                 // skip key
+            Mixed key = Mixed(read_string(m_string_buffer));
             size_t dict_ndx = read_int<size_t>();         // Throws
-            if (!handler.collection_erase(dict_ndx))      // Throws
+            if (!handler.dictionary_erase(dict_ndx, key)) // Throws
                 parser_error();
             return;
         }
-        case instr_SelectCollection: {
+        case instr_SetInsert: {
+            size_t set_ndx = read_int<size_t>(); // Throws
+            if (!handler.set_insert(set_ndx))    // Throws
+                parser_error();
+            return;
+        }
+        case instr_SetErase: {
+            size_t set_ndx = read_int<size_t>(); // Throws
+            if (!handler.set_erase(set_ndx))     // Throws
+                parser_error();
+            return;
+        }
+        case instr_SetClear: {
+            size_t set_size = read_int<size_t>(); // Throws
+            if (!handler.set_clear(set_size))     // Throws
+                parser_error();
+            return;
+        }
+        case instr_SelectList: {
             ColKey col_key = ColKey(read_int<int64_t>()); // Throws
             ObjKey key = ObjKey(read_int<int64_t>());     // Throws
             if (!handler.select_collection(col_key, key)) // Throws
@@ -828,7 +942,7 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
         }
     }
 
-    parser_error();
+    throw BadTransactLog();
 }
 
 
@@ -841,19 +955,19 @@ T TransactLogParser::read_int()
     for (int i = 0; i != max_bytes; ++i) {
         char c;
         if (!read_char(c))
-            parser_error(); // Input ended early
+            goto bad_transact_log;
         part = static_cast<unsigned char>(c);
         if (0xFF < part)
-            parser_error(); // Only the first 8 bits may be used in each byte
+            goto bad_transact_log; // Only the first 8 bits may be used in each byte
         if ((part & 0x80) == 0) {
             T p = part & 0x3F;
             if (util::int_shift_left_with_overflow_detect(p, i * 7))
-                parser_error();
+                goto bad_transact_log;
             value |= p;
             break;
         }
         if (i == max_bytes - 1)
-            parser_error(); // Too many bytes
+            goto bad_transact_log; // Too many bytes
         value |= T(part & 0x7F) << (i * 7);
     }
     if (part & 0x40) {
@@ -865,9 +979,12 @@ T TransactLogParser::read_int()
         value = -value;
         REALM_DIAG_POP();
         if (util::int_subtract_with_overflow_detect(value, 1))
-            parser_error();
+            goto bad_transact_log;
     }
     return value;
+
+bad_transact_log:
+    throw BadTransactLog();
 }
 
 inline void TransactLogParser::read_bytes(char* data, size_t size)
@@ -879,7 +996,7 @@ inline void TransactLogParser::read_bytes(char* data, size_t size)
         const char* to = m_input_begin + avail;
         std::copy(m_input_begin, to, data);
         if (!next_input_buffer())
-            parser_error();
+            throw BadTransactLog();
         data += avail;
         size -= avail;
     }
@@ -930,13 +1047,268 @@ inline bool TransactLogParser::read_char(char& c)
     return true;
 }
 
-template <typename Handler>
-void parse_transact_log(util::InputStream& is, Handler& handler)
-{
-    TransactLogParser parser;
-    parser.parse(is, handler);
-    handler.parse_complete();
-}
+
+class TransactReverser {
+public:
+    bool select_table(TableKey key)
+    {
+        sync_table();
+        m_encoder.select_table(key);
+        m_pending_ts_instr = get_inst();
+        return true;
+    }
+
+    bool insert_group_level_table(TableKey table_key)
+    {
+        sync_table();
+        m_encoder.erase_class(table_key);
+        append_instruction();
+        return true;
+    }
+
+    bool erase_class(TableKey table_key)
+    {
+        sync_table();
+        m_encoder.insert_group_level_table(table_key);
+        append_instruction();
+        return true;
+    }
+
+    bool rename_class(TableKey)
+    {
+        sync_table();
+        return true;
+    }
+
+    bool create_object(ObjKey key)
+    {
+        m_encoder.remove_object(key); // Throws
+        append_instruction();
+        return true;
+    }
+
+    bool remove_object(ObjKey key)
+    {
+        m_encoder.create_object(key); // Throws
+        append_instruction();
+        return true;
+    }
+
+    bool modify_object(ColKey col_key, ObjKey key)
+    {
+        m_encoder.modify_object(col_key, key);
+        append_instruction();
+        return true;
+    }
+
+    bool list_set(size_t ndx)
+    {
+        m_encoder.list_set(ndx);
+        append_instruction();
+        return true;
+    }
+
+    bool list_insert(size_t ndx)
+    {
+        m_encoder.list_erase(ndx);
+        append_instruction();
+        return true;
+    }
+
+    bool dictionary_insert(size_t dict_ndx, Mixed key)
+    {
+        m_encoder.dictionary_erase(dict_ndx, key);
+        return true;
+    }
+
+    bool dictionary_set(size_t dict_ndx, Mixed key)
+    {
+        m_encoder.dictionary_set(dict_ndx, key);
+        return true;
+    }
+
+    bool dictionary_erase(size_t dict_ndx, Mixed key)
+    {
+        m_encoder.dictionary_insert(dict_ndx, key);
+        return true;
+    }
+
+    bool set_link_type(ColKey key)
+    {
+        m_encoder.set_link_type(key);
+        return true;
+    }
+
+    bool insert_column(ColKey col_key)
+    {
+        m_encoder.erase_column(col_key);
+        append_instruction();
+        return true;
+    }
+
+    bool erase_column(ColKey col_key)
+    {
+        m_encoder.insert_column(col_key);
+        append_instruction();
+        return true;
+    }
+
+    bool rename_column(ColKey col_key)
+    {
+        m_encoder.rename_column(col_key);
+        return true;
+    }
+
+    bool select_collection(ColKey col_key, ObjKey key)
+    {
+        sync_list();
+        m_encoder.select_collection(col_key, key);
+        m_pending_ls_instr = get_inst();
+        return true;
+    }
+
+    bool list_move(size_t from_link_ndx, size_t to_link_ndx)
+    {
+        m_encoder.list_move(from_link_ndx, to_link_ndx);
+        append_instruction();
+        return true;
+    }
+
+    bool list_erase(size_t list_ndx)
+    {
+        m_encoder.list_insert(list_ndx);
+        append_instruction();
+        return true;
+    }
+
+    bool list_clear(size_t old_list_size)
+    {
+        // Append in reverse order because the reversed log is itself applied
+        // in reverse, and this way it generates all back-insertions rather than
+        // all front-insertions
+        for (size_t i = old_list_size; i > 0; --i) {
+            m_encoder.list_insert(i - 1);
+            append_instruction();
+        }
+        return true;
+    }
+
+    bool set_insert(size_t ndx)
+    {
+        m_encoder.set_erase(ndx);
+        append_instruction();
+        return true;
+    }
+
+    bool set_erase(size_t ndx)
+    {
+        m_encoder.set_insert(ndx);
+        append_instruction();
+        return true;
+    }
+
+    bool set_clear(size_t old_set_size)
+    {
+        for (size_t i = old_set_size; i > 0; --i) {
+            m_encoder.set_insert(i - 1);
+            append_instruction();
+        }
+        return true;
+    }
+
+    bool typed_link_change(ColKey col, TableKey dest)
+    {
+        m_encoder.typed_link_change(col, dest);
+        append_instruction();
+        return true;
+    }
+
+private:
+    _impl::TransactLogBufferStream m_buffer;
+    _impl::TransactLogEncoder m_encoder{m_buffer};
+    struct Instr {
+        size_t begin;
+        size_t end;
+    };
+    std::vector<Instr> m_instructions;
+    size_t current_instr_start = 0;
+    Instr m_pending_ts_instr{0, 0};
+    Instr m_pending_ls_instr{0, 0};
+
+    Instr get_inst()
+    {
+        Instr instr;
+        instr.begin = current_instr_start;
+        current_instr_start = transact_log_size();
+        instr.end = current_instr_start;
+        return instr;
+    }
+
+    size_t transact_log_size() const
+    {
+        REALM_ASSERT_3(m_encoder.write_position(), >=, m_buffer.get_data());
+        return m_encoder.write_position() - m_buffer.get_data();
+    }
+
+    void append_instruction()
+    {
+        m_instructions.push_back(get_inst());
+    }
+
+    void append_instruction(Instr instr)
+    {
+        m_instructions.push_back(instr);
+    }
+
+    void sync_select(Instr& pending_instr)
+    {
+        if (pending_instr.begin != pending_instr.end) {
+            append_instruction(pending_instr);
+            pending_instr = {0, 0};
+        }
+    }
+
+    void sync_list()
+    {
+        sync_select(m_pending_ls_instr);
+    }
+
+    void sync_table()
+    {
+        sync_list();
+        sync_select(m_pending_ts_instr);
+    }
+
+    friend class ReversedNoCopyInputStream;
+};
+
+
+class ReversedNoCopyInputStream : public util::NoCopyInputStream {
+public:
+    ReversedNoCopyInputStream(TransactReverser& reverser)
+        : m_instr_order(reverser.m_instructions)
+    {
+        // push any pending select_table into the buffer
+        reverser.sync_table();
+
+        m_buffer = reverser.m_buffer.get_data();
+        m_current = m_instr_order.size();
+    }
+
+    util::Span<const char> next_block() override
+    {
+        if (m_current != 0) {
+            m_current--;
+            return {m_buffer + m_instr_order[m_current].begin, m_buffer + m_instr_order[m_current].end};
+        }
+        return {m_buffer, m_buffer};
+    }
+
+private:
+    const char* m_buffer;
+    std::vector<TransactReverser::Instr>& m_instr_order;
+    size_t m_current;
+};
 
 } // namespace _impl
 } // namespace realm

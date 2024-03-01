@@ -16,7 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+import Realm
 import Realm.Private
+import Foundation
 import Combine
 
 /**
@@ -28,7 +30,6 @@ import Combine
 */
 public struct Events {
     let context: OpaquePointer
-    let realm: RLMRealm
 
     /**
     Begin recording events with the given activity name.
@@ -38,17 +39,24 @@ public struct Events {
     objects modified within an event scope will produce 'write' events which
     report the initial state of the object and the new values of all properties
     which changed.
-
-     - returns: A scope object used to commit or cancel the scope.
     */
-    public func beginScope(activity: String) -> Scope {
-        Scope(realm: realm, context: context, id: RLMEventBeginScope(context, activity))
+    public func beginScope(activity: String) {
+        RLMEventBeginScope(context, activity)
     }
 
-    /// :nodoc:
-    @available(*, unavailable, message: "Use EventScope.commit()")
+    /**
+    End recording the current event scope and report all generated events.
+
+    This function saves the events to disk locally and then
+    asynchronously sends them to the server. The optional completion function
+    is called when the event data has been successfully persisted, and *not*
+    when the actual upload has completed.
+
+    Calls to this function must be paired with calls to `beginScope()` and an
+    exception will be thrown if no scope is currently active.
+    */
     public func endScope(completion: ((Swift.Error?) -> Void)? = nil) {
-        fatalError()
+        RLMEventEndScope(context, completion)
     }
 
     /**
@@ -95,92 +103,36 @@ public struct Events {
     init?(_ realm: Realm) {
         if let context = RLMEventGetContext(realm.rlmRealm) {
             self.context = context
-            self.realm = realm.rlmRealm
         } else {
             return nil
         }
     }
-
-    /**
-    An object which represents an active event scope which can be used to
-    either commit or cancel the scope.
-    */
-    public class Scope {
-        /**
-        End recording the event scope and report all generated events.
-
-        This function saves the events to disk locally and then
-        asynchronously sends them to the server. The optional completion function
-        is called when the event data has been successfully persisted, and *not*
-        when the actual upload has completed.
-
-        An exception will be thrown if this scope has already been committed or
-        cancelled (i.e. if ``isActive`` is `false`).
-        */
-        public func commit(completion: ((Swift.Error?) -> Void)? = nil) {
-            RLMEventCommitScope(context, id, completion)
-        }
-
-        /**
-        Cancel this event scope and discard all generated events.
-
-        An exception will be thrown if this scope has already been committed or
-        cancelled (i.e. if ``isActive`` is `false`).
-        */
-        public func cancel() {
-            RLMEventCancelScope(context, id)
-        }
-
-        /**
-        True if this scope has not been committed or cancelled, and false otherwise.
-        */
-        public var isActive: Bool {
-            RLMEventIsActive(context, id)
-        }
-
-        let realm: RLMRealm
-        let context: OpaquePointer
-        let id: UInt64
-        fileprivate init(realm: RLMRealm, context: OpaquePointer, id: UInt64) {
-            self.realm = realm
-            self.context = context
-            self.id = id
-        }
-        deinit {
-            guard isActive else { return }
-            logRuntimeIssue("Deallocating an active event scope. The scope's events will be discarded.")
-            cancel()
-        }
-    }
 }
 
-#if !(os(iOS) && (arch(i386) || arch(arm)))
-@available(macOS 10.15, watchOS 6.0, iOS 13.0, tvOS 13.0, macCatalyst 13.0, *)
-extension Events.Scope {
+@available(OSX 10.15, watchOS 6.0, iOS 13.0, iOSApplicationExtension 13.0, OSXApplicationExtension 10.15, tvOS 13.0, macCatalyst 13.0, macCatalystApplicationExtension 13.0, *)
+public extension Events {
     /**
-    End recording the event scope and report all generated events.
+    End recording the current event scope and report all generated events.
 
     This function saves the events to disk locally and then asynchronously
     sends them to the server. The returned future is fulfilled when the event
     data has been successfully persisted, and *not* when the actual upload has
     completed.
 
-    An exception will be thrown if this scope has already been committed or
-    cancelled (i.e. if ``isActive`` is `false`).
+    Calls to this function must be paired with calls to `beginScope()` and an
+    exception will be thrown if no scope is currently active.
     */
     @_disfavoredOverload
-    public func commit() -> Future<Void, Error> {
-        promisify {
-            RLMEventCommitScope(self.context, self.id, $0)
-        }
-    }
-}
-
-@available(macOS 10.15, watchOS 6.0, iOS 13.0, tvOS 13.0, macCatalyst 13.0, *)
-public extension Events {
-    @available(*, unavailable, message: "Use EventScope.commit()")
     func endScope() -> Future<Void, Error> {
-        fatalError()
+        return Future<Void, Error> { promise in
+            self.endScope { error in
+                if let error = error {
+                    promise(.failure(error))
+                } else {
+                    promise(.success(()))
+                }
+            }
+        }
     }
 
     /**
@@ -206,12 +158,17 @@ public extension Events {
     @_disfavoredOverload
     func recordEvent(activity: String, eventType: String? = nil, data: String? = nil)
             -> Future<Void, Error> {
-        promisify {
-            recordEvent(activity: activity, eventType: eventType, data: data, completion: $0)
+        return Future<Void, Error> { promise in
+            self.recordEvent(activity: activity, eventType: eventType, data: data) { error in
+                if let error = error {
+                    promise(.failure(error))
+                } else {
+                    promise(.success(()))
+                }
+            }
         }
     }
 }
-#endif
 
 extension Realm {
     /// Get the event context for the Realm. Will be `nil` unless an
@@ -237,7 +194,7 @@ extension Realm {
 /// - `data`: `String?`
 /// - `timestamp`: `Date`
 /// In addition, there must be a `String?` field for each metadata key used.
-@frozen public struct EventConfiguration: Sendable {
+@frozen public struct EventConfiguration {
     /// Metadata which is attached to each event generated. Each key in the
     /// metadata dictionary is stored in a column with that name in the event
     /// Realm, and so the schema configured on the server for the AuditEvent
@@ -262,25 +219,22 @@ extension Realm {
 
     /// A logger callback function. This function should be thread-safe as it
     /// may be called from multiple threads simultaneously.
-    public typealias LoggerFunction = @Sendable (SyncLogLevel, String) -> Void
+    public typealias LoggerFunction = (SyncLogLevel, String) -> Void
     /// A logger which will be called to report information about the work done
     /// on the background event thread. If `nil`, this is instead reported to
     /// the ``SyncManager``'s logger.
-    @preconcurrency
     public var logger: LoggerFunction?
 
     /// The error handler which will be called if a sync error occurs when
     /// uploading event data. If `nil`, the error will be logged and then
     /// `abort()` will be called. Production usage should always define a
     /// custom error handler unless aborting on error is desired.
-    @preconcurrency
-    public var errorHandler: (@Sendable (Swift.Error) -> Void)?
+    public var errorHandler: ((Swift.Error) -> Void)?
 
     /// Creates an `EventConfiguration` which enables Realm event recording.
-    @preconcurrency
     public init(metadata: [String: String]? = nil, syncUser: User? = nil,
                 partitionPrefix: String = "events", logger: LoggerFunction? = nil,
-                errorHandler: (@Sendable (Swift.Error) -> Void)? = nil) {
+                errorHandler: ((Swift.Error) -> Void)? = nil) {
         self.metadata = metadata
         self.syncUser = syncUser
         self.partitionPrefix = partitionPrefix

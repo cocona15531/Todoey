@@ -16,9 +16,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#import <Foundation/Foundation.h>
 #import <Realm/RLMConstants.h>
 
-RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
+NS_ASSUME_NONNULL_BEGIN
 
 @class RLMObjectBase, RLMProperty;
 
@@ -50,4 +51,4 @@ FOUNDATION_EXTERN void RLMInitializeUnmanagedSwiftValueStorage(RLMSwiftValueStor
 /// objects that use the legacy property declaration syntax.
 FOUNDATION_EXTERN NSString *RLMSwiftValueStorageGetPropertyName(RLMSwiftValueStorage *);
 
-RLM_HEADER_AUDIT_END(nullability, sendability)
+NS_ASSUME_NONNULL_END

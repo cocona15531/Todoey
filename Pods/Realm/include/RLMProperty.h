@@ -18,7 +18,7 @@
 
 #import <Realm/RLMConstants.h>
 
-RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
+NS_ASSUME_NONNULL_BEGIN
 
 /// :nodoc:
 @protocol RLMInt @end
@@ -55,7 +55,6 @@ RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
 
  These property instances map to columns in the core database.
  */
-RLM_SWIFT_SENDABLE RLM_FINAL // not actually immutable, but the public API kinda is
 @interface RLMProperty : NSObject
 
 #pragma mark - Properties
@@ -127,7 +126,6 @@ RLM_SWIFT_SENDABLE RLM_FINAL // not actually immutable, but the public API kinda
 /**
  An `RLMPropertyDescriptor` instance represents a specific property on a given class.
  */
-RLM_SWIFT_SENDABLE RLM_FINAL
 @interface RLMPropertyDescriptor : NSObject
 
 /**
@@ -146,4 +144,4 @@ RLM_SWIFT_SENDABLE RLM_FINAL
 
 @end
 
-RLM_HEADER_AUDIT_END(nullability, sendability)
+NS_ASSUME_NONNULL_END

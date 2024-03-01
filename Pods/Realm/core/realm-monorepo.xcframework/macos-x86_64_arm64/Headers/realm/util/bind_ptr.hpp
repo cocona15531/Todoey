@@ -20,7 +20,6 @@
 #define REALM_UTIL_BIND_PTR_HPP
 
 #include <algorithm>
-#include <memory>
 #include <atomic>
 #include <ostream>
 #include <utility>
@@ -260,12 +259,6 @@ private:
     template <class>
     friend class bind_ptr;
 };
-
-// Deduction guides
-template <class T>
-bind_ptr(T*) -> bind_ptr<T>;
-template <class T>
-bind_ptr(T*, bind_ptr_base::adopt_tag) -> bind_ptr<T>;
 
 template <class T, typename... Args>
 bind_ptr<T> make_bind(Args&&... __args)

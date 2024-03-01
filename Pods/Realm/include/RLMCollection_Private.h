@@ -18,20 +18,16 @@
 
 #import <Realm/RLMCollection.h>
 
-@protocol RLMCollectionPrivate;
+#import <Realm/RLMRealm.h>
 
-RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
+@protocol RLMFastEnumerable;
 
-NSUInteger RLMUnmanagedFastEnumerate(id collection, NSFastEnumerationState *);
-void RLMCollectionSetValueForKey(id<RLMCollectionPrivate> collection, NSString *key, id _Nullable value);
+NS_ASSUME_NONNULL_BEGIN
+
+void RLMCollectionSetValueForKey(id<RLMFastEnumerable> collection, NSString *key, id _Nullable value);
 FOUNDATION_EXTERN NSString *RLMDescriptionWithMaxDepth(NSString *name, id<RLMCollection> collection, NSUInteger depth);
 FOUNDATION_EXTERN void RLMAssignToCollection(id<RLMCollection> collection, id value);
-FOUNDATION_EXTERN void RLMSetSwiftBridgeCallback(id _Nullable (*_Nonnull)(id));
-
-FOUNDATION_EXTERN
-RLMNotificationToken *RLMAddNotificationBlock(id collection, id block,
-                                              NSArray<NSString *> *_Nullable keyPaths,
-                                              dispatch_queue_t _Nullable queue);
+FOUNDATION_EXTERN id _Nullable (*_Nullable RLMSwiftBridgeValue)(id);
 
 typedef RLM_CLOSED_ENUM(int32_t, RLMCollectionType) {
     RLMCollectionTypeArray = 0,
@@ -39,4 +35,4 @@ typedef RLM_CLOSED_ENUM(int32_t, RLMCollectionType) {
     RLMCollectionTypeDictionary = 2
 };
 
-RLM_HEADER_AUDIT_END(nullability, sendability)
+NS_ASSUME_NONNULL_END

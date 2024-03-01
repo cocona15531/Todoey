@@ -35,6 +35,7 @@ typedef float Float;
 typedef double Double;
 typedef realm::StringData String;
 typedef realm::BinaryData Binary;
+typedef realm::Timestamp Timestamp;
 typedef realm::Decimal128 Decimal;
 
 struct ColumnType;

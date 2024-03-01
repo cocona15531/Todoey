@@ -116,7 +116,6 @@ public:
         Array::erase(begin);
     }
     void verify() const;
-    using Array::get_as_ref;
 };
 
 class ArrayKey : public ArrayKeyBase<1> {

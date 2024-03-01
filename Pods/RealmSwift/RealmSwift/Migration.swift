@@ -28,7 +28,7 @@ import Realm.Private
 
  - parameter oldSchemaVersion: The schema version of the Realm being migrated.
  */
-public typealias MigrationBlock = @Sendable (_ migration: Migration, _ oldSchemaVersion: UInt64) -> Void
+public typealias MigrationBlock = (_ migration: Migration, _ oldSchemaVersion: UInt64) -> Void
 
 /// An object class used during migrations.
 public typealias MigrationObject = DynamicObject
@@ -80,15 +80,17 @@ extension Realm {
  instance provides access to the old and new database schemas, the objects in the Realm, and provides functionality for
  modifying the Realm during the migration.
  */
-public typealias Migration = RLMMigration
-extension Migration {
+@frozen public struct Migration {
+
     // MARK: Properties
 
     /// The old schema, describing the Realm before applying a migration.
-    public var oldSchema: Schema { return Schema(__oldSchema) }
+    public var oldSchema: Schema { return Schema(rlmMigration.oldSchema) }
 
     /// The new schema, describing the Realm after applying a migration.
-    public var newSchema: Schema { return Schema(__newSchema) }
+    public var newSchema: Schema { return Schema(rlmMigration.newSchema) }
+
+    internal var rlmMigration: RLMMigration
 
     // MARK: Altering Objects During a Migration
 
@@ -100,7 +102,7 @@ extension Migration {
      - parameter block:           The block providing both the old and new versions of an object in this Realm.
      */
     public func enumerateObjects(ofType typeName: String, _ block: MigrationObjectEnumerateBlock) {
-        __enumerateObjects(typeName) { oldObject, newObject in
+        rlmMigration.enumerateObjects(typeName) { oldObject, newObject in
             block(unsafeBitCast(oldObject, to: MigrationObject.self),
                   unsafeBitCast(newObject, to: MigrationObject.self))
         }
@@ -123,8 +125,8 @@ extension Migration {
      - returns: The newly created object.
      */
     @discardableResult
-    public func create(_ typeName: String, value: Any = [Any]()) -> MigrationObject {
-        return unsafeBitCast(__createObject(typeName, withValue: value), to: MigrationObject.self)
+    public func create(_ typeName: String, value: Any = [:]) -> MigrationObject {
+        return unsafeBitCast(rlmMigration.createObject(typeName, withValue: value), to: MigrationObject.self)
     }
 
     /**
@@ -135,7 +137,7 @@ extension Migration {
      - parameter object: An object to be deleted from the Realm being migrated.
      */
     public func delete(_ object: MigrationObject) {
-        __delete(object.unsafeCastToRLMObject())
+        rlmMigration.delete(object.unsafeCastToRLMObject())
     }
 
     /**
@@ -150,7 +152,7 @@ extension Migration {
      */
     @discardableResult
     public func deleteData(forType typeName: String) -> Bool {
-        return __deleteData(forClassName: typeName)
+        return rlmMigration.deleteData(forClassName: typeName)
     }
 
     /**
@@ -158,12 +160,38 @@ extension Migration {
 
      - parameter className:  The name of the class whose property should be renamed. This class must be present
                              in both the old and new Realm schemas.
-     - parameter oldName:    The old column name for the property to be renamed. There must not be a property with this name in
+     - parameter oldName:    The old name for the property to be renamed. There must not be a property with this name in
                              the class as defined by the new Realm schema.
-     - parameter newName:    The new column name for the property to be renamed. There must not be a property with this name in
+     - parameter newName:    The new name for the property to be renamed. There must not be a property with this name in
                              the class as defined by the old Realm schema.
      */
     public func renameProperty(onType typeName: String, from oldName: String, to newName: String) {
-        __renameProperty(forClass: typeName, oldName: oldName, newName: newName)
+        rlmMigration.renameProperty(forClass: typeName, oldName: oldName, newName: newName)
+    }
+
+    internal init(_ rlmMigration: RLMMigration) {
+        self.rlmMigration = rlmMigration
+    }
+}
+
+
+// MARK: Private Helpers
+
+internal func accessorMigrationBlock(_ migrationBlock: @escaping MigrationBlock) -> RLMMigrationBlock {
+    return { migration, oldVersion in
+        // set all accessor classes to MigrationObject
+        for objectSchema in migration.oldSchema.objectSchema {
+            objectSchema.accessorClass = MigrationObject.self
+            // isSwiftClass is always `false` for object schema generated
+            // from the table, but we need to pretend it's from a swift class
+            // (even if it isn't) for the accessors to be initialized correctly.
+            objectSchema.isSwiftClass = true
+        }
+        for objectSchema in migration.newSchema.objectSchema {
+            objectSchema.accessorClass = MigrationObject.self
+        }
+
+        // run migration
+        migrationBlock(Migration(migration), oldVersion)
     }
 }

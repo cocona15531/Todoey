@@ -16,9 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#import <Realm/RLMConstants.h>
+#import <Foundation/Foundation.h>
 
-RLM_HEADER_AUDIT_BEGIN(nullability)
+NS_ASSUME_NONNULL_BEGIN
 
 @class RLMSyncErrorActionToken;
 
@@ -43,4 +43,4 @@ RLM_HEADER_AUDIT_BEGIN(nullability)
 
 @end
 
-RLM_HEADER_AUDIT_END(nullability)
+NS_ASSUME_NONNULL_END

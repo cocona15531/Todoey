@@ -33,8 +33,6 @@ enum class PropertyType : unsigned short;
 struct ObjectSchemaValidationException;
 struct Property;
 
-enum SchemaValidationMode { Basic = 0, SyncPBS = 1, RejectEmbeddedOrphans = 2, SyncFLX = 4 };
-
 class ObjectSchema {
 public:
     /// The type of tables supported by a realm.
@@ -82,7 +80,7 @@ public:
     bool property_is_computed(Property const& property) const noexcept;
 
     void validate(Schema const& schema, std::vector<ObjectSchemaValidationException>& exceptions,
-                  SchemaValidationMode validation_mode) const;
+                  bool for_sync) const;
 
     friend bool operator==(ObjectSchema const& a, ObjectSchema const& b) noexcept;
 
@@ -93,7 +91,18 @@ private:
     void set_primary_key_property() noexcept;
 };
 
-std::ostream& operator<<(std::ostream& o, ObjectSchema::ObjectType table_type);
+inline std::ostream& operator<<(std::ostream& o, ObjectSchema::ObjectType table_type)
+{
+    switch (table_type) {
+        case ObjectSchema::ObjectType::TopLevel:
+            return o << "TopLevel";
+        case ObjectSchema::ObjectType::Embedded:
+            return o << "Embedded";
+        case ObjectSchema::ObjectType::TopLevelAsymmetric:
+            return o << "TopLevelAsymmetric";
+    }
+    return o << "Invalid table type: " << uint8_t(table_type);
+}
 
 } // namespace realm
 

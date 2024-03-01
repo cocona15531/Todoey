@@ -16,9 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#import <Realm/RLMConstants.h>
+#import <Realm/RLMSyncUtil.h>
 
-RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
+NS_ASSUME_NONNULL_BEGIN
 @protocol RLMBSON;
 
 /// A token representing an identity provider's credentials.
@@ -58,11 +58,10 @@ extern RLMIdentityProvider const RLMIdentityProviderServerAPIKey;
 /**
  Opaque credentials representing a specific Realm App user.
  */
-RLM_SWIFT_SENDABLE RLM_FINAL // immutable final class
 @interface RLMCredentials : NSObject
 
 /// The name of the identity provider which generated the credentials token.
-@property (nonatomic, readonly) RLMIdentityProvider provider;
+@property (nonatomic) RLMIdentityProvider provider;
 
 /**
  Construct and return credentials from a Facebook account token.
@@ -121,6 +120,6 @@ RLM_SWIFT_SENDABLE RLM_FINAL // immutable final class
 /// :nodoc:
 + (instancetype)new __attribute__((unavailable("RLMAppCredentials cannot be created directly")));
 
-@end
+NS_ASSUME_NONNULL_END
 
-RLM_HEADER_AUDIT_END(nullability, sendability)
+@end

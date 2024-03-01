@@ -70,7 +70,7 @@ extension ObjectBase: BuiltInObjcBridgeable {
 
 // `NSNumber as? T` coerces values which can't be exact represented for some
 // types and fails for others. We want to always coerce, for backwards
-// compatibility if nothing else.
+// compatiblity if nothing else.
 extension Float: BuiltInObjcBridgeable {
     public static func _rlmFromObjc(_ value: Any) -> Self? {
         return (value as? NSNumber)?.floatValue
@@ -183,24 +183,6 @@ extension Results: _ObjcBridgeable {}
 extension AnyRealmCollection: _ObjcBridgeable {}
 extension List: _ObjcBridgeable {}
 extension MutableSet: _ObjcBridgeable {}
-
-extension SectionedResults: BuiltInObjcBridgeable {
-    public static func _rlmFromObjc(_ value: Any, insideOptional: Bool) -> Self? {
-        (value as? RLMSectionedResults<RLMValue, RLMValue>).map(Self.init(rlmSectionedResult:))
-    }
-    public var _rlmObjcValue: Any {
-        self.collection
-    }
-}
-
-extension ResultsSection: BuiltInObjcBridgeable {
-    public static func _rlmFromObjc(_ value: Any, insideOptional: Bool) -> Self? {
-        (value as? RLMSection<RLMValue, RLMValue>).map(Self.init(rlmSectionedResult:))
-    }
-    public var _rlmObjcValue: Any {
-        self.collection
-    }
-}
 
 extension RLMSwiftCollectionBase: Equatable {
     public static func == (lhs: RLMSwiftCollectionBase, rhs: RLMSwiftCollectionBase) -> Bool {

@@ -31,11 +31,14 @@ public:
 
 private:
     TableRef m_table;
+    TableKey m_table_key;
     ObjKey m_obj_key;
-    TransactionChangeInfo* m_info = nullptr;
+    TransactionChangeInfo* m_info;
 
     void run() override REQUIRES(!m_callback_mutex);
-    void reattach() override;
+
+    void do_attach_to(Transaction& sg) override;
+
     bool do_add_required_change_info(TransactionChangeInfo& info) override;
 };
 } // namespace realm::_impl

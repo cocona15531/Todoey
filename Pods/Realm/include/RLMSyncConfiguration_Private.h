@@ -20,7 +20,7 @@
 
 #import <Realm/RLMConstants.h>
 
-RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
+NS_ASSUME_NONNULL_BEGIN
 
 typedef RLM_CLOSED_ENUM(NSUInteger, RLMSyncStopPolicy) {
     RLMSyncStopPolicyImmediately,
@@ -33,16 +33,24 @@ typedef RLM_CLOSED_ENUM(NSUInteger, RLMSyncStopPolicy) {
 
 @interface RLMSyncConfiguration ()
 
-// Flexible sync
-- (instancetype)initWithUser:(RLMUser *)user;
-// Partition-based sync
 - (instancetype)initWithUser:(RLMUser *)user
-              partitionValue:(nullable id<RLMBSON>)partitionValue;
+              partitionValue:(nullable id<RLMBSON>)partitionValue
+                  stopPolicy:(RLMSyncStopPolicy)stopPolicy
+             clientResetMode:(RLMClientResetMode)clientResetMode
+           notifyBeforeReset:(nullable RLMClientResetBeforeBlock)beforeResetBlock
+            notifyAfterReset:(nullable RLMClientResetAfterBlock)afterResetBlock;
+
+- (instancetype)initWithUser:(RLMUser *)user
+                  stopPolicy:(RLMSyncStopPolicy)stopPolicy
+          enableFlexibleSync:(BOOL)enableFlexibleSync;
+
+@property (nonatomic, readwrite) RLMSyncStopPolicy stopPolicy;
 
 // Internal-only APIs
-@property (nonatomic, readwrite) RLMSyncStopPolicy stopPolicy;
+@property (nullable, nonatomic) NSURL *customFileURL;
+
 @property (nonatomic, readonly) BOOL enableFlexibleSync;
 
 @end
 
-RLM_HEADER_AUDIT_END(nullability, sendability)
+NS_ASSUME_NONNULL_END

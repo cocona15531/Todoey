@@ -191,7 +191,7 @@ class SyncUser : public std::enable_shared_from_this<SyncUser>, public Subscriba
     friend class SyncSession;
 
 public:
-    enum class State {
+    enum class State : std::size_t {
         LoggedOut,
         LoggedIn,
         Removed,
@@ -285,10 +285,6 @@ public:
     void register_session(std::shared_ptr<SyncSession>) REQUIRES(!m_mutex);
 
     /// Refreshes the custom data for this user
-    /// If update_location is true, the location metadata will be queried before the request
-    void refresh_custom_data(bool update_location,
-                             util::UniqueFunction<void(util::Optional<app::AppError>)> completion_block)
-        REQUIRES(!m_mutex);
     void refresh_custom_data(util::UniqueFunction<void(util::Optional<app::AppError>)> completion_block)
         REQUIRES(!m_mutex);
 
@@ -316,11 +312,6 @@ public:
         return lhs.identity() == rhs.identity();
     }
 
-    friend bool operator!=(const SyncUser& lhs, const SyncUser& rhs)
-    {
-        return !(lhs == rhs);
-    }
-
 protected:
     friend class SyncManager;
     void detach_from_sync_manager() REQUIRES(!m_mutex);
@@ -330,8 +321,6 @@ private:
     static std::mutex s_binding_context_factory_mutex;
 
     bool do_is_logged_in() const REQUIRES(m_tokens_mutex);
-
-    std::vector<std::shared_ptr<SyncSession>> revive_sessions() REQUIRES(m_mutex);
 
     std::atomic<State> m_state GUARDED_BY(m_mutex);
 

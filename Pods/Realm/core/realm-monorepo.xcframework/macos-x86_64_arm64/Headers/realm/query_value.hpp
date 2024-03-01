@@ -28,7 +28,7 @@ namespace realm {
 
 class TypeOfValue {
 public:
-    enum Attribute {
+    enum Attribute : int64_t {
         Null = 1,
         Int = 2,
         Double = 4,

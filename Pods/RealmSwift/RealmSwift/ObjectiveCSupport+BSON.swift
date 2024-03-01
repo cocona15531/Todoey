@@ -42,12 +42,6 @@ public extension ObjectiveCSupport {
         return nil
     }
 
-    static func convert(_ object: Document) -> [String: RLMBSON] {
-        object.reduce(into: Dictionary<String, RLMBSON>()) { (result: inout [String: RLMBSON], kvp) in
-            result[kvp.key] = kvp.value.map(convertBson) ?? NSNull()
-        }
-    }
-
     /// Convert an `AnyBSON` to a `RLMBSON`.
     static func convertBson(object: AnyBSON) -> RLMBSON {
         switch object {
@@ -70,7 +64,9 @@ public extension ObjectiveCSupport {
         case .objectId(let val):
             return val as RLMObjectId
         case .document(let val):
-            return convert(val) as NSDictionary
+            return val.reduce(into: Dictionary<String, RLMBSON?>()) { (result: inout [String: RLMBSON?], kvp) in
+                result[kvp.key] = kvp.value.map(convertBson) ?? NSNull()
+            } as NSDictionary
         case .array(let val):
             return val.map { $0.map(convertBson) } as NSArray
         case .maxKey:
@@ -86,10 +82,6 @@ public extension ObjectiveCSupport {
         case .null:
             return NSNull()
         }
-    }
-
-    static func convert(_ object: [String: RLMBSON]) -> Document {
-        object.mapValues { convert(object: $0) }
     }
 
     /// Convert a `RLMBSON` to an `AnyBSON`.
@@ -158,10 +150,12 @@ public extension ObjectiveCSupport {
         case .minKey:
             return .minKey
         case .document:
-            guard let val = bson as? Dictionary<String, RLMBSON> else {
+            guard let val = bson as? Dictionary<String, RLMBSON?> else {
                 return nil
             }
-            return .document(convert(val))
+            return .document(val.reduce(into: Dictionary<String, AnyBSON?>()) { (result: inout [String: AnyBSON?], kvp) in
+                result[kvp.key] = kvp.value.map(convert)
+            })
         case .array:
             guard let val = bson as? Array<RLMBSON?> else {
                 return nil

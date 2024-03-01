@@ -29,8 +29,8 @@ class TableRef;
 
 class ConstTableRef {
 public:
-    constexpr ConstTableRef() noexcept = default;
-    constexpr ConstTableRef(std::nullptr_t) noexcept {}
+    ConstTableRef() noexcept {}
+    ConstTableRef(std::nullptr_t) noexcept {}
     ConstTableRef(const TableRef& other) noexcept;
 
     const Table* operator->() const;
@@ -91,8 +91,14 @@ protected:
 
 class TableRef : public ConstTableRef {
 public:
-    constexpr TableRef() noexcept = default;
-    constexpr TableRef(std::nullptr_t) noexcept {}
+    TableRef() noexcept
+        : ConstTableRef()
+    {
+    }
+    TableRef(std::nullptr_t) noexcept
+        : ConstTableRef()
+    {
+    }
 
     Table* operator->() const;
     Table& operator*() const;

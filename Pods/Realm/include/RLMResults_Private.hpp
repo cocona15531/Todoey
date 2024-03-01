@@ -18,16 +18,14 @@
 
 #import "RLMResults_Private.h"
 
-#import "RLMCollection_Private.hpp"
-
 #import <realm/object-store/results.hpp>
 
 class RLMClassInfo;
 
-RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
+NS_ASSUME_NONNULL_BEGIN
 
-@interface RLMResults () <RLMCollectionPrivate> {
-@public
+@interface RLMResults () {
+@protected
     realm::Results _results;
 }
 
@@ -44,24 +42,25 @@ RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
 + (instancetype)resultsWithObjectInfo:(RLMClassInfo&)info results:(realm::Results&&)results;
 
 - (instancetype)subresultsWithResults:(realm::Results)results;
-- (RLMClassInfo *)objectInfo;
-- (void)deleteObjectsFromRealm;
 @end
+
+NS_ASSUME_NONNULL_END
 
 // Utility functions
 
 [[gnu::noinline]]
 [[noreturn]]
-void RLMThrowCollectionException(NSString *collectionName);
+void RLMThrowResultsError(NSString * _Nullable aggregateMethod);
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wnullability-completeness"
 template<typename Function>
-static auto translateCollectionError(Function&& f, NSString *collectionName) {
+static auto translateRLMResultsErrors(Function&& f, NSString *aggregateMethod=nil) {
     try {
         return f();
     }
     catch (...) {
-        RLMThrowCollectionException(collectionName);
+        RLMThrowResultsError(aggregateMethod);
     }
 }
-
-RLM_HEADER_AUDIT_END(nullability, sendability)
+#pragma clang diagnostic pop

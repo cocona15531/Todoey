@@ -20,7 +20,7 @@
 
 @class RLMObjectSchema;
 
-RLM_HEADER_AUDIT_BEGIN(nullability)
+NS_ASSUME_NONNULL_BEGIN
 
 @interface RLMResults ()
 @property (nonatomic, readonly, getter=isAttached) BOOL attached;
@@ -30,4 +30,4 @@ RLM_HEADER_AUDIT_BEGIN(nullability)
 
 @end
 
-RLM_HEADER_AUDIT_END(nullability)
+NS_ASSUME_NONNULL_END

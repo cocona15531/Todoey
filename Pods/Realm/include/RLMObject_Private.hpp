@@ -18,7 +18,6 @@
 
 #import "RLMObject_Private.h"
 
-#import "RLMSwiftObject.h"
 #import "RLMRealm_Private.hpp"
 #import "RLMUtil.hpp"
 

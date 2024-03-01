@@ -6,6 +6,6 @@ target 'Todoey' do
 
   # Pods for Todoey
   
-  pod 'RealmSwift'
+  pod 'RealmSwift', '10.28.2'
 
 end

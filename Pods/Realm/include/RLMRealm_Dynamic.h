@@ -23,7 +23,7 @@
 
 @class RLMResults<RLMObjectType>;
 
-RLM_HEADER_AUDIT_BEGIN(nullability)
+NS_ASSUME_NONNULL_BEGIN
 
 @interface RLMRealm (Dynamic)
 
@@ -115,4 +115,4 @@ RLM_HEADER_AUDIT_BEGIN(nullability)
 
 @end
 
-RLM_HEADER_AUDIT_END(nullability)
+NS_ASSUME_NONNULL_END

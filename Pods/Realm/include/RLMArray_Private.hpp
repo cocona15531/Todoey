@@ -44,7 +44,7 @@ class RLMObservationInfo;
 }
 @end
 
-@interface RLMManagedArray () <RLMCollectionPrivate>
+@interface RLMManagedArray () <RLMFastEnumerable>
 - (RLMManagedArray *)initWithBackingCollection:(realm::List)list
                                     parentInfo:(RLMClassInfo *)parentInfo
                                       property:(RLMProperty *)property;
@@ -63,3 +63,11 @@ void RLMValidateArrayObservationKey(NSString *keyPath, RLMArray *array);
 // Initialize the observation info for an array if needed
 void RLMEnsureArrayObservationInfo(std::unique_ptr<RLMObservationInfo>& info,
                                    NSString *keyPath, RLMArray *array, id observed);
+
+
+//
+// RLMResults private methods
+//
+@interface RLMResults () <RLMFastEnumerable>
+- (void)deleteObjectsFromRealm;
+@end

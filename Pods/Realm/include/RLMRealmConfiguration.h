@@ -16,11 +16,12 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#import <Foundation/Foundation.h>
 #import <Realm/RLMRealm.h>
 
 @class RLMEventConfiguration, RLMSyncConfiguration;
 
-RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
+NS_ASSUME_NONNULL_BEGIN
 
 /**
  A block called when opening a Realm for the first time during the life
@@ -31,14 +32,12 @@ RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
  Return `YES` to indicate that an attempt to compact the file should be made.
  The compaction will be skipped if another process is accessing it.
  */
-RLM_SWIFT_SENDABLE
 typedef BOOL (^RLMShouldCompactOnLaunchBlock)(NSUInteger totalBytes, NSUInteger bytesUsed);
 
 /**
  A block which receives a subscription set instance, that can be used to add an initial set of subscriptions which will be executed
  when the Realm is first opened.
  */
-RLM_SWIFT_SENDABLE
 typedef void(^RLMFlexibleSyncInitialSubscriptionsBlock)(RLMSyncSubscriptionSet * _Nonnull subscriptions);
 
 /**
@@ -159,7 +158,7 @@ typedef void(^RLMFlexibleSyncInitialSubscriptionsBlock)(RLMSyncSubscriptionSet *
  number of versions will instead throw an exception. This can be used with a
  low value during development to help identify places that may be problematic,
  or in production use to cause the app to crash rather than produce a Realm
- file which is too large to be opened.
+ file which is too large to be oened.
 
  */
 @property (nonatomic) NSUInteger maximumNumberOfActiveVersions;
@@ -194,4 +193,4 @@ typedef void(^RLMFlexibleSyncInitialSubscriptionsBlock)(RLMSyncSubscriptionSet *
 
 @end
 
-RLM_HEADER_AUDIT_END(nullability, sendability)
+NS_ASSUME_NONNULL_END

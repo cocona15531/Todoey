@@ -3,21 +3,19 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <exception>
-#include <functional>
 #include <memory>
-#include <string>
 #include <utility>
+#include <functional>
+#include <exception>
+#include <string>
 
 #include <realm/util/buffer.hpp>
 #include <realm/util/functional.hpp>
-#include <realm/util/future.hpp>
+#include <realm/util/logger.hpp>
 #include <realm/sync/client_base.hpp>
+#include <realm/sync/subscriptions.hpp>
 
 namespace realm::sync {
-
-class MigrationStore;
-class SubscriptionStore;
 
 class Client {
 public:
@@ -43,16 +41,12 @@ public:
     /// Run the internal event-loop of the client. At most one thread may
     /// execute run() at any given time. The call will not return until somebody
     /// calls stop().
-    void run() noexcept;
+    void run();
 
     /// See run().
     ///
     /// Thread-safe.
-    void shutdown() noexcept;
-
-    /// Forces all connections to close and waits for any pending work on the event
-    /// loop to complete. All sessions must be destroyed before calling shutdown_and_wait.
-    void shutdown_and_wait();
+    void stop() noexcept;
 
     /// \brief Cancel current or next reconnect delay for all servers.
     ///
@@ -62,9 +56,6 @@ public:
     ///
     /// Thread-safe.
     void cancel_reconnect_delay();
-
-    /// Forces all open connections to disconnect/reconnect. To be used in testing.
-    void voluntary_disconnect_all_connections();
 
     /// \brief Wait for session termination to complete.
     ///
@@ -139,7 +130,7 @@ class BadServerUrl; // Exception
 /// their bound state), as long as they are associated with the same client
 /// object, or with two different client objects that do not overlap in
 /// time. This means, in particular, that it is an error to create two bound
-/// session objects for the same local Realm file, if they are associated with
+/// session objects for the same local Realm file, it they are associated with
 /// two different client objects that overlap in time, even if the session
 /// objects do not overlap in time (in their bound state). It is the
 /// responsibility of the application to ensure that these rules are adhered
@@ -207,11 +198,6 @@ public:
         /// to file system paths, and thus, these restrictions do not apply.
         std::string realm_identifier = "";
 
-        /// The user id of the logged in user for this sync session. This will be used
-        /// along with the server_address/server_port/protocol_envelope to determine
-        /// which connection to the server this session will use.
-        std::string user_id;
-
         /// The protocol used for communicating with the server. See
         /// ProtocolEnvelope.
         ProtocolEnvelope protocol_envelope = ProtocolEnvelope::realm;
@@ -223,18 +209,12 @@ public:
         /// change in the C++ mock server.
         std::string service_identifier = "";
 
-        ///
-        /// DEPRECATED - Will be removed in a future release
-        ///
         /// authorization_header_name is the name of the HTTP header containing
         /// the Realm access token. The value of the HTTP header is "Bearer <token>".
         /// authorization_header_name does not participate in session
         /// multiplexing partitioning.
         std::string authorization_header_name = "Authorization";
 
-        ///
-        /// DEPRECATED - Will be removed in a future release
-        ///
         /// custom_http_headers is a map of custom HTTP headers. The keys of the map
         /// are HTTP header names, and the values are the corresponding HTTP
         /// header values.
@@ -242,16 +222,10 @@ public:
         /// authorization_header_name must be set to anther value.
         std::map<std::string, std::string> custom_http_headers;
 
-        ///
-        /// DEPRECATED - Will be removed in a future release
-        ///
         /// Controls whether the server certificate is verified for SSL
         /// connections. It should generally be true in production.
         bool verify_servers_ssl_certificate = true;
 
-        ///
-        /// DEPRECATED - Will be removed in a future release
-        ///
         /// ssl_trust_certificate_path is the path of a trust/anchor
         /// certificate used by the client to verify the server certificate.
         /// ssl_trust_certificate_path is only used if the protocol is ssl and
@@ -269,9 +243,6 @@ public:
         /// store is used otherwise.
         util::Optional<std::string> ssl_trust_certificate_path;
 
-        ///
-        /// DEPRECATED - Will be removed in a future release
-        ///
         /// If Client::Config::ssl_verify_callback is set, that function is called
         /// to verify the certificate, unless verify_servers_ssl_certificate is
         /// false.
@@ -334,14 +305,7 @@ public:
         using ClientReset = sync::ClientReset;
         util::Optional<ClientReset> client_reset_config;
 
-        ///
-        /// DEPRECATED - Will be removed in a future release
-        ///
         util::Optional<SyncConfig::ProxyConfig> proxy_config;
-
-        /// When integrating a flexible sync bootstrap, process this many bytes of
-        /// changeset data in a single integration attempt.
-        size_t flx_bootstrap_batch_size_bytes = 1024 * 1024;
 
         /// Set to true to cause the integration of the first received changeset
         /// (in a DOWNLOAD message) to fail.
@@ -349,7 +313,15 @@ public:
         /// This feature exists exclusively for testing purposes at this time.
         bool simulate_integration_error = false;
 
-        std::function<SyncClientHookAction(const SyncClientHookData&)> on_sync_client_event_hook;
+        // Will be called after a download message is received and validated by
+        // the client but befefore it's been transformed or applied. To be used in
+        // testing only.
+        std::function<void(const sync::SyncProgress&, int64_t, sync::DownloadBatchState)>
+            on_download_message_received_hook;
+        // Will be called after each bootstrap message is added to the pending bootstrap store,
+        // but before processing a finalized bootstrap. For testing only.
+        std::function<bool(const sync::SyncProgress&, int64_t, sync::DownloadBatchState)>
+            on_bootstrap_message_processed_hook;
     };
 
     /// \brief Start a new session for the specified client-side Realm.
@@ -357,15 +329,14 @@ public:
     /// Note that the session is not fully activated until you call bind().
     /// Also note that if you call set_sync_transact_callback(), it must be
     /// done before calling bind().
-    Session(Client&, std::shared_ptr<DB>, std::shared_ptr<SubscriptionStore>, std::shared_ptr<MigrationStore>,
-            Config&& = {});
+    Session(Client&, std::shared_ptr<DB>, std::shared_ptr<SubscriptionStore>, Config&& = {});
 
     /// This leaves the right-hand side session object detached. See "Thread
     /// safety" section under detach().
     Session(Session&&) noexcept;
 
     /// Create a detached session object (see detach()).
-    Session() noexcept = default;
+    Session() noexcept;
 
     /// Implies detachment. See "Thread safety" section under detach().
     ~Session() noexcept;
@@ -497,6 +468,7 @@ public:
     /// under Session for more on this.
     void set_progress_handler(util::UniqueFunction<ProgressHandler>);
 
+
     using ConnectionStateChangeListener = void(ConnectionState, util::Optional<SessionErrorInfo>);
 
     /// \brief Install a connection state change listener.
@@ -564,7 +536,23 @@ public:
     ///
     /// The two other forms of bind() are convenience functions.
     void bind();
-
+    /// \brief parses parameters and replaces the parameters in the Session::Config object
+    /// before the session is bound.
+    /// \param server_url For example "realm://sync.realm.io/test". See
+    /// server_address, server_path, and server_port in Session::Config for
+    /// information about the individual components of the URL. See
+    /// ProtocolEnvelope for the list of available URL schemes and the
+    /// associated default ports.
+    ///
+    /// \throw BadServerUrl if the specified server URL is malformed.
+    void bind(std::string server_url, std::string signed_user_token);
+    /// void bind(std::string server_address, std::string server_path,
+    ///           std::string signed_user_token, port_type server_port = 0,
+    ///           ProtocolEnvelope protocol = ProtocolEnvelope::realm);
+    /// replaces the corresponding parameters from the Session::Config object
+    /// before the session is bound.
+    void bind(std::string server_address, std::string server_path, std::string signed_user_token,
+              port_type server_port = 0, ProtocolEnvelope protocol = ProtocolEnvelope::realm);
     /// @}
 
     /// \brief Refresh the access token associated with this session.
@@ -732,14 +720,6 @@ public:
 
     void on_new_flx_sync_subscription(int64_t new_version);
 
-    util::Future<std::string> send_test_command(std::string command_body);
-
-    /// Returns the app services connection id if the session is connected, otherwise
-    /// returns an empty string. This function blocks until the value is set from
-    /// the event loop thread. If an error occurs, this will throw an ExceptionForStatus
-    /// with the error.
-    std::string get_appservices_connection_id();
-
 private:
     SessionWrapper* m_impl = nullptr;
 
@@ -751,11 +731,11 @@ std::ostream& operator<<(std::ostream& os, SyncConfig::ProxyConfig::Type);
 
 // Implementation
 
-class BadServerUrl : public Exception {
+class BadServerUrl : public std::exception {
 public:
-    BadServerUrl(std::string_view url)
-        : Exception(ErrorCodes::BadServerUrl, util::format("Unable to parse server URL '%1'", url))
+    const char* what() const noexcept override
     {
+        return "Bad server URL";
     }
 };
 
@@ -764,6 +744,8 @@ inline Session::Session(Session&& sess) noexcept
 {
     sess.m_impl = nullptr;
 }
+
+inline Session::Session() noexcept {}
 
 inline Session::~Session() noexcept
 {

@@ -16,11 +16,12 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#import <Realm/RLMConstants.h>
+#import <Foundation/Foundation.h>
+
 #import <Realm/RLMObjectBase.h>
 #import <Realm/RLMThreadSafeReference.h>
 
-RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
+NS_ASSUME_NONNULL_BEGIN
 
 @class RLMNotificationToken;
 @class RLMObjectSchema;
@@ -431,6 +432,7 @@ RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
  */
 + (NSDictionary<NSString *, RLMPropertyDescriptor *> *)linkingObjectsProperties;
 
+
 #pragma mark - Getting & Querying Objects from the Default Realm
 
 /**
@@ -538,7 +540,9 @@ RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
  `NO`, a `nil` error, and an array of `RLMPropertyChange` objects which
  indicate which properties of the objects were modified.
 
- `error` is always `nil` and will be removed in a future version.
+ If an error occurs, `deleted` will be `NO`, `changes` will be `nil`, and
+ `error` will include information about the error. The block will never be
+ called again after an error occurs.
  */
 typedef void (^RLMObjectChangeBlock)(BOOL deleted,
                                      NSArray<RLMPropertyChange *> *_Nullable changes,
@@ -652,7 +656,7 @@ typedef void (^RLMObjectChangeBlock)(BOOL deleted,
  @warning The queue must be a serial queue.
 
  @param block The block to be called whenever a change occurs.
- @param keyPaths The block will be called for changes occurring on these keypaths. If no
+ @param keyPaths The block will be called for changes occuring on these keypaths. If no
  key paths are given, notifications are delivered for every property key path.
  @param queue The serial queue to deliver notifications to.
  @return A token which must be held for as long as you want updates to be delivered.
@@ -692,7 +696,7 @@ typedef void (^RLMObjectChangeBlock)(BOOL deleted,
  @warning The queue must be a serial queue.
 
  @param block The block to be called whenever a change occurs.
- @param keyPaths The block will be called for changes occurring on these keypaths. If no
+ @param keyPaths The block will be called for changes occuring on these keypaths. If no
  key paths are given, notifications are delivered for every property key path.
  @return A token which must be held for as long as you want updates to be delivered.
  */
@@ -808,4 +812,4 @@ __attribute__((deprecated("RLM_ARRAY_TYPE has been deprecated. Use RLM_COLLECTIO
 @protocol RLM_OBJECT_SUBCLASS <NSObject>   \
 @end
 
-RLM_HEADER_AUDIT_END(nullability, sendability)
+NS_ASSUME_NONNULL_END

@@ -84,32 +84,34 @@ uint_least64_t cityhash_64(const unsigned char* data, size_t len) noexcept;
 class StringData {
 public:
     /// Construct a null reference.
-    constexpr StringData() noexcept = default;
+    StringData() noexcept;
+
+    StringData(int) = delete;
 
     /// If \a external_data is 'null', \a data_size must be zero.
-    constexpr StringData(const char* external_data, size_t data_size) noexcept;
+    StringData(const char* external_data, size_t data_size) noexcept;
 
     template <class T, class A>
-    constexpr StringData(const std::basic_string<char, T, A>&);
+    StringData(const std::basic_string<char, T, A>&);
 
     template <class T, class A>
     operator std::basic_string<char, T, A>() const;
 
     template <class T, class A>
-    constexpr StringData(const util::Optional<std::basic_string<char, T, A>>&);
+    StringData(const util::Optional<std::basic_string<char, T, A>>&);
 
-    constexpr StringData(std::string_view sv);
+    StringData(std::string_view sv);
 
-    constexpr StringData(const null&) noexcept {}
+    StringData(const null&) noexcept;
 
     /// Initialize from a zero terminated C style string. Pass null to construct
     /// a null reference.
-    constexpr StringData(const char* c_str) noexcept;
+    StringData(const char* c_str) noexcept;
 
-    constexpr char operator[](size_t i) const noexcept;
+    char operator[](size_t i) const noexcept;
 
-    constexpr const char* data() const noexcept;
-    constexpr size_t size() const noexcept;
+    const char* data() const noexcept;
+    size_t size() const noexcept;
 
     /// Is this a null reference?
     ///
@@ -127,10 +129,10 @@ public:
     /// of the result of calling this function. In other words, a StringData
     /// object is converted to true if it is not the null reference, otherwise
     /// it is converted to false.
-    constexpr bool is_null() const noexcept;
+    bool is_null() const noexcept;
 
-    friend constexpr bool operator==(const StringData&, const StringData&) noexcept;
-    friend constexpr bool operator!=(const StringData&, const StringData&) noexcept;
+    friend bool operator==(const StringData&, const StringData&) noexcept;
+    friend bool operator!=(const StringData&, const StringData&) noexcept;
 
     //@{
     /// Trivial bytewise lexicographical comparison.
@@ -140,9 +142,9 @@ public:
     friend bool operator>=(const StringData&, const StringData&) noexcept;
     //@}
 
-    constexpr bool begins_with(StringData) const noexcept;
-    constexpr bool ends_with(StringData) const noexcept;
-    constexpr bool contains(StringData) const noexcept;
+    bool begins_with(StringData) const noexcept;
+    bool ends_with(StringData) const noexcept;
+    bool contains(StringData) const noexcept;
     bool contains(StringData d, const std::array<uint8_t, 256> &charmap) const noexcept;
     
     // Wildcard matching ('?' for single char, '*' for zero or more chars)
@@ -152,17 +154,17 @@ public:
     //@{
     /// Undefined behavior if \a n, \a i, or <tt>i+n</tt> is greater than
     /// size().
-    constexpr StringData prefix(size_t n) const noexcept;
-    constexpr StringData suffix(size_t n) const noexcept;
-    constexpr StringData substr(size_t i, size_t n) const noexcept;
-    constexpr StringData substr(size_t i) const noexcept;
+    StringData prefix(size_t n) const noexcept;
+    StringData suffix(size_t n) const noexcept;
+    StringData substr(size_t i, size_t n) const noexcept;
+    StringData substr(size_t i) const noexcept;
     //@}
 
     template <class C, class T>
     friend std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>&, const StringData&);
 
-    constexpr explicit operator bool() const noexcept;
-    constexpr explicit operator std::string_view() const noexcept
+    explicit operator bool() const noexcept;
+    explicit operator std::string_view() const noexcept
     {
         return std::string_view(m_data, m_size);
     }
@@ -172,8 +174,8 @@ public:
     size_t hash() const noexcept;
 
 private:
-    const char* m_data = nullptr;
-    size_t m_size = 0;
+    const char* m_data;
+    size_t m_size;
 
     static bool matchlike(const StringData& text, const StringData& pattern) noexcept;
     static bool matchlike_ins(const StringData& text, const StringData& pattern_upper,
@@ -186,21 +188,27 @@ private:
 
 // Implementation:
 
-constexpr inline StringData::StringData(const char* external_data, size_t data_size) noexcept
+inline StringData::StringData() noexcept
+    : m_data(nullptr)
+    , m_size(0)
+{
+}
+
+inline StringData::StringData(const char* external_data, size_t data_size) noexcept
     : m_data(external_data)
     , m_size(data_size)
 {
     REALM_ASSERT_DEBUG(external_data || data_size == 0);
 }
 
-constexpr inline StringData::StringData(std::string_view sv)
+inline StringData::StringData(std::string_view sv)
     : m_data(sv.data())
     , m_size(sv.size())
 {
 }
 
 template <class T, class A>
-constexpr inline StringData::StringData(const std::basic_string<char, T, A>& s)
+inline StringData::StringData(const std::basic_string<char, T, A>& s)
     : m_data(s.data())
     , m_size(s.size())
 {
@@ -213,45 +221,52 @@ inline StringData::operator std::basic_string<char, T, A>() const
 }
 
 template <class T, class A>
-constexpr inline StringData::StringData(const util::Optional<std::basic_string<char, T, A>>& s)
+inline StringData::StringData(const util::Optional<std::basic_string<char, T, A>>& s)
     : m_data(s ? s->data() : nullptr)
     , m_size(s ? s->size() : 0)
 {
 }
 
-constexpr inline StringData::StringData(const char* c_str) noexcept
+inline StringData::StringData(const null&) noexcept
+    : m_data(nullptr)
+    , m_size(0)
+{
+}
+
+inline StringData::StringData(const char* c_str) noexcept
     : m_data(c_str)
+    , m_size(0)
 {
     if (c_str)
         m_size = std::char_traits<char>::length(c_str);
 }
 
-constexpr inline char StringData::operator[](size_t i) const noexcept
+inline char StringData::operator[](size_t i) const noexcept
 {
     return m_data[i];
 }
 
-constexpr inline const char* StringData::data() const noexcept
+inline const char* StringData::data() const noexcept
 {
     return m_data;
 }
 
-constexpr inline size_t StringData::size() const noexcept
+inline size_t StringData::size() const noexcept
 {
     return m_size;
 }
 
-constexpr inline bool StringData::is_null() const noexcept
+inline bool StringData::is_null() const noexcept
 {
     return !m_data;
 }
 
-constexpr inline bool operator==(const StringData& a, const StringData& b) noexcept
+inline bool operator==(const StringData& a, const StringData& b) noexcept
 {
     return a.m_size == b.m_size && a.is_null() == b.is_null() && safe_equal(a.m_data, a.m_data + a.m_size, b.m_data);
 }
 
-constexpr inline bool operator!=(const StringData& a, const StringData& b) noexcept
+inline bool operator!=(const StringData& a, const StringData& b) noexcept
 {
     return !(a == b);
 }
@@ -281,21 +296,21 @@ inline bool operator>=(const StringData& a, const StringData& b) noexcept
     return !(a < b);
 }
 
-constexpr inline bool StringData::begins_with(StringData d) const noexcept
+inline bool StringData::begins_with(StringData d) const noexcept
 {
     if (is_null() && !d.is_null())
         return false;
     return d.m_size <= m_size && safe_equal(m_data, m_data + d.m_size, d.m_data);
 }
 
-constexpr inline bool StringData::ends_with(StringData d) const noexcept
+inline bool StringData::ends_with(StringData d) const noexcept
 {
     if (is_null() && !d.is_null())
         return false;
     return d.m_size <= m_size && safe_equal(m_data + m_size - d.m_size, m_data + m_size, d.m_data);
 }
 
-constexpr inline bool StringData::contains(StringData d) const noexcept
+inline bool StringData::contains(StringData d) const noexcept
 {
     if (is_null() && !d.is_null())
         return false;
@@ -349,22 +364,22 @@ inline bool StringData::like(StringData d) const noexcept
     return matchlike(*this, d);
 }
 
-constexpr inline StringData StringData::prefix(size_t n) const noexcept
+inline StringData StringData::prefix(size_t n) const noexcept
 {
     return substr(0, n);
 }
 
-constexpr inline StringData StringData::suffix(size_t n) const noexcept
+inline StringData StringData::suffix(size_t n) const noexcept
 {
     return substr(m_size - n);
 }
 
-constexpr inline StringData StringData::substr(size_t i, size_t n) const noexcept
+inline StringData StringData::substr(size_t i, size_t n) const noexcept
 {
     return StringData(m_data + i, n);
 }
 
-constexpr inline StringData StringData::substr(size_t i) const noexcept
+inline StringData StringData::substr(size_t i) const noexcept
 {
     return substr(i, m_size - i);
 }
@@ -382,7 +397,7 @@ inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const
     return out;
 }
 
-constexpr inline StringData::operator bool() const noexcept
+inline StringData::operator bool() const noexcept
 {
     return !is_null();
 }

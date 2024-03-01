@@ -22,11 +22,13 @@ namespace realm {
 class UUID;
 }
 
-RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
+NS_ASSUME_NONNULL_BEGIN
 
 @interface NSUUID (RLMUUIDSupport) <RLMUUID>
-- (instancetype)initWithRealmUUID:(realm::UUID)uuidValue;
-- (realm::UUID)rlm_uuidValue;
-@end
 
-RLM_HEADER_AUDIT_END(nullability, sendability)
+- (instancetype)initWithRealmUUID:(realm::UUID)uuidValue;
+
+- (realm::UUID)rlm_uuidValue;
+
+@end
+NS_ASSUME_NONNULL_END

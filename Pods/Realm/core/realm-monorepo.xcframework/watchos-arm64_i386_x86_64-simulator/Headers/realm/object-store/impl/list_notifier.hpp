@@ -25,8 +25,8 @@
 
 #include <realm/collection.hpp>
 
-namespace realm::_impl {
-// Despite the name, this also supports Set and index-based notifications on Dictionary
+namespace realm {
+namespace _impl {
 class ListNotifier : public CollectionNotifier {
 public:
     ListNotifier(std::shared_ptr<Realm> realm, CollectionBase const& list, PropertyType type);
@@ -35,21 +35,24 @@ private:
     PropertyType m_type;
     std::unique_ptr<CollectionBase> m_list;
 
-    // The last-seen size of the collection so that when the parent of the collection
-    // is deleted we can report each row as being deleted
+    TableKey m_table;
+    ColKey m_col;
+    ObjKey m_obj;
+
+    // The last-seen size of the LinkView so that we can report row deletions
+    // when the LinkView itself is deleted
     size_t m_prev_size;
 
-    TransactionChangeInfo* m_info = nullptr;
-
-    void attach(CollectionBase const& src);
+    TransactionChangeInfo* m_info;
 
     void run() override;
 
-    void reattach() override;
+    void do_attach_to(Transaction& sg) override;
 
     void release_data() noexcept override;
     bool do_add_required_change_info(TransactionChangeInfo& info) override;
 };
-} // namespace realm::_impl
+} // namespace _impl
+} // namespace realm
 
 #endif // REALM_LIST_NOTIFIER_HPP

@@ -153,22 +153,25 @@ public protocol _RealmMapValue {
     case update(CollectionType, deletions: [Int], insertions: [Int], modifications: [Int])
 
     /**
-     Errors can no longer occur. This case is unused and will be removed in the
-     next major version.
+     If an error occurs, notification blocks are called one time with a `.error`
+     result and an `NSError` containing details about the error. This can only
+     currently happen if opening the Realm on a background thread to calcuate
+     the change set fails. The callback will never be called again after it is
+     invoked with a .error value.
      */
     case error(Error)
 
-    init(value: CollectionType?, change: RLMCollectionChange?, error: Error?) {
+    static func fromObjc(value: CollectionType?, change: RLMCollectionChange?, error: Error?) -> RealmCollectionChange {
         if let error = error {
-            self = .error(error)
-        } else if let change = change {
-            self = .update(value!,
+            return .error(error)
+        }
+        if let change = change {
+            return .update(value!,
                 deletions: forceCast(change.deletions, to: [Int].self),
                 insertions: forceCast(change.insertions, to: [Int].self),
                 modifications: forceCast(change.modifications, to: [Int].self))
-        } else {
-            self = .initial(value!)
         }
+        return .initial(value!)
     }
 }
 
@@ -228,7 +231,7 @@ public protocol RealmCollectionBase: RandomAccessCollection, LazyCollectionProto
 /**
  A homogenous collection of `Object`s which can be retrieved, filtered, sorted, and operated upon.
 */
-public protocol RealmCollection: RealmCollectionBase, Equatable where Iterator == RLMIterator<Element> {
+public protocol RealmCollection: RealmCollectionBase, Equatable {
     // MARK: Properties
 
     /// The Realm which manages the collection, or `nil` for unmanaged collections.
@@ -469,7 +472,7 @@ public protocol RealmCollection: RealmCollectionBase, Equatable where Iterator =
             // ...
          case .update:
             // This case is hit:
-            // - after the token is initialized
+            // - after the token is intialized
             // - when the name property of an object in the
             // collection is modified
             // - when an element is inserted or removed
@@ -523,109 +526,9 @@ public protocol RealmCollection: RealmCollectionBase, Equatable where Iterator =
                  on queue: DispatchQueue?,
                  _ block: @escaping (RealmCollectionChange<Self>) -> Void) -> NotificationToken
 
-#if swift(>=5.8)
-    /**
-    Registers a block to be called each time the collection changes.
-
-    The block will be asynchronously called with an initial version of the
-    collection, and then called again after each write transaction which changes
-    either any of the objects in the collection, or which objects are in the
-    collection.
-
-    The `actor` parameter passed to the block is the actor which you pass to this
-    function. This parameter is required to isolate the callback to the actor.
-
-    The `change` parameter that is passed to the block reports, in the form of
-    indices within the collection, which of the objects were added, removed, or
-    modified after the previous notification. The `collection` field in the change
-    enum will be isolated to the requested actor, and is safe to use within that
-    actor only. See the ``RealmCollectionChange`` documentation for more
-    information on the change information supplied and an example of how to use it
-    to update a `UITableView`.
-
-    Once the initial notification is delivered, the collection will be fully
-    evaluated and up-to-date, and accessing it will never perform any blocking
-    work. This guarantee holds only as long as you do not perform a write
-    transaction on the same actor as notifications are being delivered to. If you
-    do, accessing the collection before the next notification is delivered may need
-    to rerun the query.
-
-    Notifications are delivered to the given actor's executor. When notifications
-    can't be delivered instantly, multiple notifications may be coalesced into a
-    single notification. This can include the notification with the initial
-    collection: any writes which occur before the initial notification is delivered
-    may not produce change notifications.
-
-    Adding, removing or assigning objects in the collection always produces a
-    notification. By default, modifying the objects which a collection links to
-    (and the objects which those objects link to, if applicable) will also report
-    that index in the collection as being modified. If a non-empty array of
-    keypaths is provided, then only modifications to those keypaths will mark the
-    object as modified. For example:
-
-    ```swift
-    class Dog: Object {
-        @Persisted var name: String
-        @Persisted var age: Int
-        @Persisted var toys: List<Toy>
-    }
-
-    let dogs = realm.objects(Dog.self)
-    let token = await dogs.observe(keyPaths: ["name"], on: myActor) { actor, changes in
-        switch changes {
-        case .initial(let dogs):
-            // Query has finished running and dogs can not be used without blocking
-        case .update:
-            // This case is hit:
-            // - after the token is initialized
-            // - when the name property of an object in the collection is modified
-            // - when an element is inserted or removed from the collection.
-            // This block is not triggered:
-            // - when a value other than name is modified on one of the elements.
-        case .error:
-            // Can no longer happen but is left for backwards compatiblity
-        }
-    }
-    ```
-    - If the observed key path were `["toys.brand"]`, then any insertion or
-      deletion to the `toys` list on any of the collection's elements would trigger
-      the block. Changes to the `brand` value on any `Toy` that is linked to a `Dog`
-      in this collection will trigger the block. Changes to a value other than
-      `brand` on any `Toy` that is linked to a `Dog` in this collection would not
-      trigger the block. Any insertion or removal to the `Dog` type collection being
-      observed would also trigger a notification.
-    - If the above example observed the `["toys"]` key path, then any insertion,
-      deletion, or modification to the `toys` list for any element in the collection
-      would trigger the block. Changes to any value on any `Toy` that is linked to a
-      `Dog` in this collection would *not* trigger the block. Any insertion or
-      removal to the `Dog` type collection being observed would still trigger a
-      notification.
-
-    You must retain the returned token for as long as you want updates to be sent
-    to the block. To stop receiving updates, call `invalidate()` on the token.
-
-    - warning: This method cannot be called during a write transaction, or when the containing Realm is read-only.
-
-    - parameter keyPaths: Only properties contained in the key paths array will trigger
-                       the block when they are modified. If `nil` or empty, notifications
-                       will be delivered for any property change on the object.
-                       String key paths which do not correspond to a valid a property
-                       will throw an exception. See description above for
-                       more detail on linked properties.
-    - parameter actor: The actor to isolate the notifications to.
-    - parameter block: The block to be called whenever a change occurs.
-    - returns: A token which must be held for as long as you want updates to be delivered.
-    */
-    @available(macOS 10.15, tvOS 13.0, iOS 13.0, watchOS 6.0, *)
-    @_unsafeInheritExecutor
-    func observe<A: Actor>(keyPaths: [String]?,
-                           on actor: A,
-                           _ block: @Sendable @escaping (isolated A, RealmCollectionChange<Self>) -> Void) async -> NotificationToken
-#endif
-
     // MARK: Frozen Objects
 
-    /// Returns true if this collection is frozen
+    /// Returns if this collection is frozen
     var isFrozen: Bool { get }
 
     /**
@@ -650,21 +553,6 @@ public protocol RealmCollection: RealmCollectionBase, Equatable where Iterator =
      If called on a live collection, will return itself.
     */
     func thaw() -> Self?
-
-    /**
-     Sorts this collection from a given array of sort descriptors and performs sectioning via a
-     user defined callback, returning the result as an instance of `SectionedResults`.
-
-     - parameter sortDescriptors: An array of `SortDescriptor`s to sort by.
-     - parameter keyBlock: A callback which is invoked on each element in the Results collection.
-                           This callback is to return the section key for the element in the collection.
-
-     - note: The primary sort descriptor must be responsible for determining the section key.
-
-     - returns: An instance of `SectionedResults`.
-     */
-    func sectioned<Key: _Persistable>(sortDescriptors: [SortDescriptor],
-                                      _ keyBlock: @escaping ((Element) -> Key)) -> SectionedResults<Key, Element>
 }
 
 // MARK: - Codable
@@ -798,64 +686,6 @@ public extension RealmCollection where Element: ObjectBase {
     func average<T: _HasPersistedType>(of keyPath: KeyPath<Element, T>) -> T? where T.PersistedType: AddableType {
         average(ofProperty: _name(for: keyPath))
     }
-
-    /**
-     Sorts and sections this collection from a given property key path, returning the result
-     as an instance of `SectionedResults`. For every unique value retrieved from the
-     keyPath a section key will be generated.
-
-     - parameter keyPath: The property key path to sort & section on.
-     - parameter ascending: The direction to sort in.
-
-     - returns: An instance of `SectionedResults`.
-     */
-    func sectioned<Key: _Persistable>(by keyPath: KeyPath<Element, Key>,
-                                      ascending: Bool = true) -> SectionedResults<Key, Element> where Element: ObjectBase {
-        return sectioned(sortDescriptors: [.init(keyPath: _name(for: keyPath), ascending: ascending)], {
-            return $0[keyPath: keyPath]
-        })
-    }
-
-    /**
-     Sorts and sections this collection from a given property key path, returning the result
-     as an instance of `SectionedResults`. For every unique value retrieved from the
-     keyPath a section key will be generated.
-
-     - parameter keyPath: The property key path to sort & section on.
-     - parameter sortDescriptors: An array of `SortDescriptor`s to sort by.
-
-     - note: The primary sort descriptor must be responsible for determining the section key.
-
-     - returns: An instance of `SectionedResults`.
-     */
-    func sectioned<Key: _Persistable>(by keyPath: KeyPath<Element, Key>,
-                                      sortDescriptors: [SortDescriptor]) -> SectionedResults<Key, Element> where Element: ObjectBase {
-        guard let sortDescriptor = sortDescriptors.first else {
-            throwRealmException("Can not section Results with empty sortDescriptor parameter.")
-        }
-        let keyPathString = _name(for: keyPath)
-        if keyPathString != sortDescriptor.keyPath {
-            throwRealmException("The section key path must match the primary sort descriptor.")
-        }
-        return sectioned(sortDescriptors: sortDescriptors, { $0[keyPath: keyPath] })
-    }
-
-    /**
-     Sorts this collection from a given array of `SortDescriptor`'s and performs sectioning
-     via a user defined callback function.
-
-     - parameter block: A callback which is invoked on each element in the collection.
-                        This callback is to return the section key for the element in the collection.
-     - parameter sortDescriptors: An array of `SortDescriptor`s to sort by.
-
-     - note: The primary sort descriptor must be responsible for determining the section key.
-
-     - returns: An instance of `SectionedResults`.
-     */
-    func sectioned<Key: _Persistable>(by block: @escaping ((Element) -> Key),
-                                      sortDescriptors: [SortDescriptor]) -> SectionedResults<Key, Element> where Element: ObjectBase {
-        return sectioned(sortDescriptors: sortDescriptors, block)
-    }
 }
 
 public extension RealmCollection where Element.PersistedType: MinMaxType {
@@ -962,25 +792,6 @@ public extension RealmCollection where Element.PersistedType: SortableType {
     }
 }
 
-// MARK: - Sectioned Results on primitives
-
-public extension RealmCollection {
-    /**
-     Sorts this collection in ascending or descending order and performs sectioning
-     via a user defined callback function.
-
-     - parameter block: A callback which is invoked on each element in the collection.
-                        This callback is to return the section key for the element in the collection.
-     - parameter ascending: The direction to sort in.
-
-     - returns: An instance of `SectionedResults`.
-     */
-    func sectioned<Key: _Persistable>(by block: @escaping ((Element) -> Key),
-                                      ascending: Bool = true) -> SectionedResults<Key, Element> {
-        sectioned(sortDescriptors: [.init(keyPath: "self", ascending: ascending)], block)
-    }
-}
-
 // MARK: - NSPredicate builders
 
 public extension RealmCollection {
@@ -1074,7 +885,7 @@ public extension RealmCollection {
             // ...
          case .update:
             // This case is hit:
-            // - after the token is initialized
+            // - after the token is intialized
             // - when the name property of an object in the
             // collection is modified
             // - when an element is inserted or removed
@@ -1114,124 +925,18 @@ public extension RealmCollection {
      - warning: This method cannot be called during a write transaction, or when the containing Realm is read-only.
 
      - parameter keyPaths: Only properties contained in the key paths array will trigger
-                           the block when they are modified. If `nil`, notifications
-                           will be delivered for any property change on the object.
-                           See description above for more detail on linked properties.
+                           the block when they are modified. See description above for more detail on linked properties.
      - parameter queue: The serial dispatch queue to receive notification on. If
                         `nil`, notifications are delivered to the current thread.
      - parameter block: The block to be called whenever a change occurs.
      - returns: A token which must be held for as long as you want updates to be delivered.
      */
-    func observe(keyPaths: [String]? = nil,
-                 on queue: DispatchQueue? = nil,
-                 _ block: @escaping (RealmCollectionChange<Self>) -> Void) -> NotificationToken {
-        return self.observe(keyPaths: keyPaths, on: queue, block)
+    func observe<T: ObjectBase>(keyPaths: [PartialKeyPath<T>],
+                                on queue: DispatchQueue? = nil,
+                                _ block: @escaping (RealmCollectionChange<Self>) -> Void) -> NotificationToken {
+        return self.observe(keyPaths: keyPaths.map(_name(for:)), on: queue, block)
     }
 
-#if swift(>=5.8)
-    /**
-    Registers a block to be called each time the collection changes.
-
-    The block will be asynchronously called with an initial version of the
-    collection, and then called again after each write transaction which changes
-    either any of the objects in the collection, or which objects are in the
-    collection.
-
-    The `actor` parameter passed to the block is the actor which you pass to this
-    function. This parameter is required to isolate the callback to the actor.
-
-    The `change` parameter that is passed to the block reports, in the form of
-    indices within the collection, which of the objects were added, removed, or
-    modified after the previous notification. The `collection` field in the change
-    enum will be isolated to the requested actor, and is safe to use within that
-    actor only. See the ``RealmCollectionChange`` documentation for more
-    information on the change information supplied and an example of how to use it
-    to update a `UITableView`.
-
-    Once the initial notification is delivered, the collection will be fully
-    evaluated and up-to-date, and accessing it will never perform any blocking
-    work. This guarantee holds only as long as you do not perform a write
-    transaction on the same actor as notifications are being delivered to. If you
-    do, accessing the collection before the next notification is delivered may need
-    to rerun the query.
-
-    Notifications are delivered to the given actor's executor. When notifications
-    can't be delivered instantly, multiple notifications may be coalesced into a
-    single notification. This can include the notification with the initial
-    collection: any writes which occur before the initial notification is delivered
-    may not produce change notifications.
-
-    Adding, removing or assigning objects in the collection always produces a
-    notification. By default, modifying the objects which a collection links to
-    (and the objects which those objects link to, if applicable) will also report
-    that index in the collection as being modified. If a non-empty array of
-    keypaths is provided, then only modifications to those keypaths will mark the
-    object as modified. For example:
-
-    ```swift
-    class Dog: Object {
-        @Persisted var name: String
-        @Persisted var age: Int
-        @Persisted var toys: List<Toy>
-    }
-
-    let dogs = realm.objects(Dog.self)
-    let token = await dogs.observe(keyPaths: ["name"], on: myActor) { actor, changes in
-        switch changes {
-        case .initial(let dogs):
-            // Query has finished running and dogs can not be used without blocking
-        case .update:
-            // This case is hit:
-            // - after the token is initialized
-            // - when the name property of an object in the collection is modified
-            // - when an element is inserted or removed from the collection.
-            // This block is not triggered:
-            // - when a value other than name is modified on one of the elements.
-        case .error:
-            // Can no longer happen but is left for backwards compatiblity
-        }
-    }
-    ```
-    - If the observed key path were `["toys.brand"]`, then any insertion or
-      deletion to the `toys` list on any of the collection's elements would trigger
-      the block. Changes to the `brand` value on any `Toy` that is linked to a `Dog`
-      in this collection will trigger the block. Changes to a value other than
-      `brand` on any `Toy` that is linked to a `Dog` in this collection would not
-      trigger the block. Any insertion or removal to the `Dog` type collection being
-      observed would also trigger a notification.
-    - If the above example observed the `["toys"]` key path, then any insertion,
-      deletion, or modification to the `toys` list for any element in the collection
-      would trigger the block. Changes to any value on any `Toy` that is linked to a
-      `Dog` in this collection would *not* trigger the block. Any insertion or
-      removal to the `Dog` type collection being observed would still trigger a
-      notification.
-
-    You must retain the returned token for as long as you want updates to be sent
-    to the block. To stop receiving updates, call `invalidate()` on the token.
-
-    - warning: This method cannot be called during a write transaction, or when the containing Realm is read-only.
-
-    - parameter keyPaths: Only properties contained in the key paths array will trigger
-                       the block when they are modified. If `nil` or empty, notifications
-                       will be delivered for any property change on the object.
-                       String key paths which do not correspond to a valid a property
-                       will throw an exception. See description above for
-                       more detail on linked properties.
-    - parameter actor: The actor to isolate the notifications to.
-    - parameter block: The block to be called whenever a change occurs.
-    - returns: A token which must be held for as long as you want updates to be delivered.
-    */
-    @available(macOS 10.15, tvOS 13.0, iOS 13.0, watchOS 6.0, *)
-    @_unsafeInheritExecutor
-    func observe<A: Actor>(keyPaths: [String]? = nil,
-                           on actor: A,
-                           _ block: @Sendable @escaping (isolated A, RealmCollectionChange<Self>) -> Void) async -> NotificationToken {
-        await self.observe(keyPaths: keyPaths, on: actor, block)
-    }
-#endif
-}
-
-public extension RealmCollection where Element: ObjectBase {
     /**
      Registers a block to be called each time the collection changes.
 
@@ -1300,7 +1005,7 @@ public extension RealmCollection where Element: ObjectBase {
             // ...
          case .update:
             // This case is hit:
-            // - after the token is initialized
+            // - after the token is intialized
             // - when the name property of an object in the
             // collection is modified
             // - when an element is inserted or removed
@@ -1340,178 +1045,18 @@ public extension RealmCollection where Element: ObjectBase {
      - warning: This method cannot be called during a write transaction, or when the containing Realm is read-only.
 
      - parameter keyPaths: Only properties contained in the key paths array will trigger
-                           the block when they are modified. See description above for more detail on linked properties.
+                           the block when they are modified. If `nil`, notifications
+                           will be delivered for any property change on the object.
+                           See description above for more detail on linked properties.
      - parameter queue: The serial dispatch queue to receive notification on. If
                         `nil`, notifications are delivered to the current thread.
      - parameter block: The block to be called whenever a change occurs.
      - returns: A token which must be held for as long as you want updates to be delivered.
      */
-    func observe(keyPaths: [PartialKeyPath<Element>],
+    func observe(keyPaths: [String]? = nil,
                  on queue: DispatchQueue? = nil,
                  _ block: @escaping (RealmCollectionChange<Self>) -> Void) -> NotificationToken {
-        return self.observe(keyPaths: keyPaths.map(_name(for:)), on: queue, block)
-    }
-
-#if swift(>=5.8)
-    /**
-    Registers a block to be called each time the collection changes.
-
-    The block will be asynchronously called with an initial version of the
-    collection, and then called again after each write transaction which changes
-    either any of the objects in the collection, or which objects are in the
-    collection.
-
-    The `actor` parameter passed to the block is the actor which you pass to this
-    function. This parameter is required to isolate the callback to the actor.
-
-    The `change` parameter that is passed to the block reports, in the form of
-    indices within the collection, which of the objects were added, removed, or
-    modified after the previous notification. The `collection` field in the change
-    enum will be isolated to the requested actor, and is safe to use within that
-    actor only. See the ``RealmCollectionChange`` documentation for more
-    information on the change information supplied and an example of how to use it
-    to update a `UITableView`.
-
-    Once the initial notification is delivered, the collection will be fully
-    evaluated and up-to-date, and accessing it will never perform any blocking
-    work. This guarantee holds only as long as you do not perform a write
-    transaction on the same actor as notifications are being delivered to. If you
-    do, accessing the collection before the next notification is delivered may need
-    to rerun the query.
-
-    Notifications are delivered to the given actor's executor. When notifications
-    can't be delivered instantly, multiple notifications may be coalesced into a
-    single notification. This can include the notification with the initial
-    collection: any writes which occur before the initial notification is delivered
-    may not produce change notifications.
-
-    Adding, removing or assigning objects in the collection always produces a
-    notification. By default, modifying the objects which a collection links to
-    (and the objects which those objects link to, if applicable) will also report
-    that index in the collection as being modified. If a non-empty array of
-    keypaths is provided, then only modifications to those keypaths will mark the
-    object as modified. For example:
-
-    ```swift
-    class Dog: Object {
-        @Persisted var name: String
-        @Persisted var age: Int
-        @Persisted var toys: List<Toy>
-    }
-
-    let dogs = realm.objects(Dog.self)
-    let token = await dogs.observe(keyPaths: [\.name], on: myActor) { actor, changes in
-        switch changes {
-        case .initial(let dogs):
-            // Query has finished running and dogs can not be used without blocking
-        case .update:
-            // This case is hit:
-            // - after the token is initialized
-            // - when the name property of an object in the collection is modified
-            // - when an element is inserted or removed from the collection.
-            // This block is not triggered:
-            // - when a value other than name is modified on one of the elements.
-        case .error:
-            // Can no longer happen but is left for backwards compatiblity
-        }
-    }
-    ```
-    - If the observed key path were `[\.toys.brand]`, then any insertion or
-      deletion to the `toys` list on any of the collection's elements would trigger
-      the block. Changes to the `brand` value on any `Toy` that is linked to a `Dog`
-      in this collection will trigger the block. Changes to a value other than
-      `brand` on any `Toy` that is linked to a `Dog` in this collection would not
-      trigger the block. Any insertion or removal to the `Dog` type collection being
-      observed would also trigger a notification.
-    - If the above example observed the `[\.toys]` key path, then any insertion,
-      deletion, or modification to the `toys` list for any element in the collection
-      would trigger the block. Changes to any value on any `Toy` that is linked to a
-      `Dog` in this collection would *not* trigger the block. Any insertion or
-      removal to the `Dog` type collection being observed would still trigger a
-      notification.
-
-    You must retain the returned token for as long as you want updates to be sent
-    to the block. To stop receiving updates, call `invalidate()` on the token.
-
-    - warning: This method cannot be called during a write transaction, or when the containing Realm is read-only.
-
-    - parameter keyPaths: Only properties contained in the key paths array will trigger
-                       the block when they are modified. If empty, notifications
-                       will be delivered for any property change on the object.
-                       String key paths which do not correspond to a valid a property
-                       will throw an exception. See description above for
-                       more detail on linked properties.
-    - parameter actor: The actor to isolate the notifications to.
-    - parameter block: The block to be called whenever a change occurs.
-    - returns: A token which must be held for as long as you want updates to be delivered.
-    */
-    @available(macOS 10.15, tvOS 13.0, iOS 13.0, watchOS 6.0, *)
-    @_unsafeInheritExecutor
-    func observe<A: Actor>(keyPaths: [PartialKeyPath<Element>], on actor: A,
-                           _ block: @Sendable @escaping (isolated A, RealmCollectionChange<Self>) -> Void) async -> NotificationToken {
-        await observe(keyPaths: keyPaths.map(_name(for:)), on: actor, block)
-    }
-#endif
-}
-
-extension RealmCollection {
-    /**
-     Sorts and sections this collection from a given property key path, returning the result
-     as an instance of `SectionedResults`. For every unique value retrieved from the
-     keyPath a section key will be generated.
-
-     - parameter keyPath: The property key path to sort on.
-     - parameter ascending: The direction to sort in.
-
-     - returns: An instance of `SectionedResults`.
-     */
-    public func sectioned<Key: _Persistable, O: ObjectBase>(by keyPath: KeyPath<Element, Key>,
-                                                            ascending: Bool = true) -> SectionedResults<Key, Element> where Element: Projection<O> {
-        let keyPathString = _name(for: keyPath)
-        return sectioned(sortDescriptors: [.init(keyPath: keyPathString, ascending: ascending)], {
-            return $0[keyPath: keyPath]
-        })
-    }
-
-    /**
-     Sorts and sections this collection from a given property key path, returning the result
-     as an instance of `SectionedResults`. For every unique value retrieved from the
-     keyPath a section key will be generated.
-
-     - parameter keyPath: The property key path to sort on.
-     - parameter sortDescriptors: An array of `SortDescriptor`s to sort by.
-
-     - note: The primary sort descriptor must be responsible for determining the section key.
-
-     - returns: An instance of `SectionedResults`.
-     */
-    public func sectioned<Key: _Persistable, O: ObjectBase>(by keyPath: KeyPath<Element, Key>,
-                                                            sortDescriptors: [SortDescriptor]) -> SectionedResults<Key, Element> where Element: Projection<O> {
-        guard let sortDescriptor = sortDescriptors.first else {
-            throwRealmException("Can not section Results with empty sortDescriptor parameter.")
-        }
-        let keyPathString = _name(for: keyPath)
-        if keyPathString != sortDescriptor.keyPath {
-            throwRealmException("The section key path must match the primary sort descriptor.")
-        }
-        return sectioned(sortDescriptors: sortDescriptors, { $0[keyPath: keyPath] })
-    }
-
-    /**
-     Sorts this collection from a given array of sort descriptors and performs sectioning from
-     a user defined callback, returning the result as an instance of `SectionedResults`.
-
-     - parameter block: A callback which is invoked on each element in the Results collection.
-                        This callback is to return the section key for the element in the collection.
-     - parameter sortDescriptors: An array of `SortDescriptor`s to sort by.
-
-     - note: The primary sort descriptor must be responsible for determining the section key.
-
-     - returns: An instance of `SectionedResults`.
-     */
-    public func sectioned<Key: _Persistable, O: ObjectBase>(by block: @escaping ((Element) -> Key),
-                                                            sortDescriptors: [SortDescriptor]) -> SectionedResults<Key, Element> where Element: Projection<O> {
-        return sectioned(sortDescriptors: sortDescriptors, block)
+        return self.observe(keyPaths: keyPaths, on: queue, block)
     }
 }
 
@@ -1553,12 +1098,6 @@ extension RealmCollection {
     public static func == (lhs: AnyRealmCollection<Element>, rhs: AnyRealmCollection<Element>) -> Bool {
         lhs.collection.isEqual(rhs.collection)
     }
-
-    /// :nodoc:
-    public func makeIterator() -> RLMIterator<Element> {
-        return RLMIterator(collection: collection)
-    }
-
 }
 
 extension AnyRealmCollection: Encodable where Element: Encodable {}
@@ -1747,7 +1286,7 @@ public struct ProjectedCollection<Element>: RandomAccessCollection, CustomString
             // ...
          case .update:
             // This case is hit:
-            // - after the token is initialized
+            // - after the token is intialized
             // - when the name property of an object in the
             // collection is modified
             // - when an element is inserted or removed

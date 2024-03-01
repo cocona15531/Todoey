@@ -56,7 +56,6 @@ class Array;
 class Expression;
 class Group;
 class Transaction;
-class LinkMap;
 
 namespace metrics {
 class QueryInfo;
@@ -211,8 +210,6 @@ public:
     Query& ends_with(ColKey column_key, StringData value, bool case_sensitive = true);
     Query& contains(ColKey column_key, StringData value, bool case_sensitive = true);
     Query& like(ColKey column_key, StringData value, bool case_sensitive = true);
-    Query& fulltext(ColKey column_key, StringData value);
-    Query& fulltext(ColKey column_key, StringData value, const LinkMap&);
 
     // These are shortcuts for equal(StringData(c_str)) and
     // not_equal(StringData(c_str)), and are needed to avoid unwanted
@@ -253,24 +250,38 @@ public:
 
 
     // Searching
-    ObjKey find() const;
-    TableView find_all(size_t limit = size_t(-1)) const;
+    ObjKey find();
+    TableView find_all(size_t limit = size_t(-1));
 
     // Aggregates
     size_t count() const;
-    TableView find_all(const DescriptorOrdering& descriptor) const;
-    size_t count(const DescriptorOrdering& descriptor) const;
-
-    // Aggregates return nullopt if the operation is not supported on the given column
-    // Everything but `sum` returns `some(null)` if there are no non-null values
-    // Sum returns `some(0)` if there are no non-null values.
-    std::optional<Mixed> sum(ColKey col_key) const;
-    std::optional<Mixed> min(ColKey col_key, ObjKey* = nullptr) const;
-    std::optional<Mixed> max(ColKey col_key, ObjKey* = nullptr) const;
-    std::optional<Mixed> avg(ColKey col_key, size_t* value_count = nullptr) const;
+    TableView find_all(const DescriptorOrdering& descriptor);
+    size_t count(const DescriptorOrdering& descriptor);
+    int64_t sum_int(ColKey column_key) const;
+    double average_int(ColKey column_key, size_t* resultcount = nullptr) const;
+    int64_t maximum_int(ColKey column_key, ObjKey* return_ndx = nullptr) const;
+    int64_t minimum_int(ColKey column_key, ObjKey* return_ndx = nullptr) const;
+    double sum_float(ColKey column_key) const;
+    double average_float(ColKey column_key, size_t* resultcount = nullptr) const;
+    float maximum_float(ColKey column_key, ObjKey* return_ndx = nullptr) const;
+    float minimum_float(ColKey column_key, ObjKey* return_ndx = nullptr) const;
+    double sum_double(ColKey column_key) const;
+    double average_double(ColKey column_key, size_t* resultcount = nullptr) const;
+    double maximum_double(ColKey column_key, ObjKey* return_ndx = nullptr) const;
+    double minimum_double(ColKey column_key, ObjKey* return_ndx = nullptr) const;
+    Timestamp maximum_timestamp(ColKey column_key, ObjKey* return_ndx = nullptr);
+    Timestamp minimum_timestamp(ColKey column_key, ObjKey* return_ndx = nullptr);
+    Decimal128 sum_decimal128(ColKey column_key) const;
+    Decimal128 maximum_decimal128(ColKey column_key, ObjKey* return_ndx = nullptr) const;
+    Decimal128 minimum_decimal128(ColKey column_key, ObjKey* return_ndx = nullptr) const;
+    Decimal128 average_decimal128(ColKey column_key, size_t* resultcount = nullptr) const;
+    Decimal128 sum_mixed(ColKey column_key) const;
+    Mixed maximum_mixed(ColKey column_key, ObjKey* return_ndx = nullptr) const;
+    Mixed minimum_mixed(ColKey column_key, ObjKey* return_ndx = nullptr) const;
+    Decimal128 average_mixed(ColKey column_key, size_t* resultcount = nullptr) const;
 
     // Deletion
-    size_t remove() const;
+    size_t remove();
 
 #if REALM_MULTITHREAD_QUERY
     // Multi-threading
@@ -309,10 +320,10 @@ public:
     // or empty vector if the query is not associated with a table.
     TableVersions sync_view_if_needed() const;
 
-    std::string validate() const;
+    std::string validate();
 
-    std::string get_description() const;
-    std::string get_description_safe() const noexcept;
+    std::string get_description(const std::string& class_prefix = "") const;
+    std::string get_description(util::serializer::SerialisationState& state) const;
 
     Query& set_ordering(util::bind_ptr<DescriptorOrdering> ordering);
     // This will remove the ordering from the Query object
@@ -327,7 +338,6 @@ private:
     size_t find_internal(size_t start = 0, size_t end = size_t(-1)) const;
     void handle_pending_not();
     void set_table(TableRef tr);
-    std::string get_description(util::serializer::SerialisationState& state) const;
 
 public:
     std::unique_ptr<Query> clone_for_handover(Transaction* tr, PayloadPolicy policy) const
@@ -350,8 +360,13 @@ private:
     template <typename TConditionFunction>
     Query& add_size_condition(ColKey column_key, int64_t value);
 
+    template <typename T,
+              typename R = typename aggregate_operations::Average<typename util::RemoveOptional<T>::type>::ResultType>
+    R average(ColKey column_key, size_t* resultcount = nullptr) const;
+
     template <typename T>
-    void aggregate(QueryStateBase& st, ColKey column_key) const;
+    void aggregate(QueryStateBase& st, ColKey column_key, size_t* resultcount = nullptr,
+                   ObjKey* return_ndx = nullptr) const;
 
     size_t find_best_node(ParentNode* pn) const;
     void aggregate_internal(ParentNode* pn, QueryStateBase* st, size_t start, size_t end,
@@ -378,8 +393,6 @@ private:
     friend class SubQueryCount;
     friend class PrimitiveListCount;
     friend class metrics::QueryInfo;
-    template <class>
-    friend class AggregateHelper;
 
     std::string error_code;
 

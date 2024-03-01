@@ -1807,15 +1807,14 @@ realm::Query RLMPredicateToQuery(NSPredicate *predicate, RLMObjectSchema *object
         return query;
     }
 
-    try {
-        @autoreleasepool {
-            QueryBuilder(query, group, schema).apply_predicate(predicate, objectSchema);
-        }
-    }
-    catch (std::exception const& e) {
-        @throw RLMException(e);
+    @autoreleasepool {
+        QueryBuilder(query, group, schema).apply_predicate(predicate, objectSchema);
     }
 
+    // Test the constructed query in core
+    std::string validateMessage = query.validate();
+    RLMPrecondition(validateMessage.empty(), @"Invalid query", @"%.*s",
+                    (int)validateMessage.size(), validateMessage.c_str());
     return query;
 }
 

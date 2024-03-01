@@ -16,7 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#import <Realm/RLMConstants.h>
+#import <Foundation/Foundation.h>
+
 #import <Realm/RLMCredentials.h>
 #import <Realm/RLMRealmConfiguration.h>
 #import <Realm/RLMSyncConfiguration.h>
@@ -37,22 +38,18 @@ typedef NS_ENUM(NSUInteger, RLMUserState) {
 };
 
 /// A block type used to report an error related to a specific user.
-RLM_SWIFT_SENDABLE
 typedef void(^RLMOptionalUserBlock)(RLMUser * _Nullable, NSError * _Nullable);
 
 /// A block type used to report an error on a network request from the user.
-RLM_SWIFT_SENDABLE
 typedef void(^RLMUserOptionalErrorBlock)(NSError * _Nullable);
 
 /// A block which returns a dictionary should there be any custom data set for a user
-RLM_SWIFT_SENDABLE
 typedef void(^RLMUserCustomDataBlock)(NSDictionary * _Nullable, NSError * _Nullable);
 
 /// A block type for returning from function calls.
-RLM_SWIFT_SENDABLE
 typedef void(^RLMCallFunctionCompletionBlock)(id<RLMBSON> _Nullable, NSError * _Nullable);
 
-RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
+NS_ASSUME_NONNULL_BEGIN
 
 /**
  A `RLMUser` instance represents a single Realm App user account.
@@ -64,7 +61,6 @@ RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
  Note that user objects are only vended out via SDK APIs, and cannot be directly
  initialized. User objects can be accessed from any thread.
  */
-RLM_SWIFT_SENDABLE RLM_FINAL // internally thread-safe
 @interface RLMUser : NSObject
 
 /**
@@ -118,8 +114,6 @@ RLM_SWIFT_SENDABLE RLM_FINAL // internally thread-safe
  @param partitionValue The `RLMBSON` value the Realm is partitioned on.
  @param clientResetMode Determines file recovery behavior in the event of a client reset.
                         See: https://docs.mongodb.com/realm/sync/error-handling/client-resets/
- 
- @return A configuration object with the sync configuration set to use the given partition value.
  */
 - (RLMRealmConfiguration *)configurationWithPartitionValue:(nullable id<RLMBSON>)partitionValue
                                            clientResetMode:(RLMClientResetMode)clientResetMode NS_REFINED_FOR_SWIFT;
@@ -132,8 +126,6 @@ RLM_SWIFT_SENDABLE RLM_FINAL // internally thread-safe
                         See: https://docs.mongodb.com/realm/sync/error-handling/client-resets/
  @param beforeResetBlock A callback which notifies prior to a client reset occurring. See: `RLMClientResetBeforeBlock`
  @param afterResetBlock A callback which notifies after a client reset has occurred. See: `RLMClientResetAfterBlock`
- 
- @return A configuration object with the sync configuration set to use the given partition value.
  */
 - (RLMRealmConfiguration *)configurationWithPartitionValue:(nullable id<RLMBSON>)partitionValue
                                            clientResetMode:(RLMClientResetMode)clientResetMode
@@ -141,75 +133,24 @@ RLM_SWIFT_SENDABLE RLM_FINAL // internally thread-safe
                                           notifyAfterReset:(nullable RLMClientResetAfterBlock)afterResetBlock NS_REFINED_FOR_SWIFT;
 
 /**
- Create a partition-based sync configuration instance for the given partition value.
-
- @param partitionValue The `RLMBSON` value the Realm is partitioned on.
- @param clientResetMode Determines file recovery behavior in the event of a client reset.
-                        See: https://docs.mongodb.com/realm/sync/error-handling/client-resets/
- @param manualClientResetHandler An error reporting block that is invoked during a client reset.
-                                @See ``RLMSyncErrorReportingBlock`` and ``RLMClientResetInfo``
- 
- @return A configuration object with the sync configuration set to use the given partition value.
- */
-- (RLMRealmConfiguration *)configurationWithPartitionValue:(nullable id<RLMBSON>)partitionValue
-                                           clientResetMode:(RLMClientResetMode)clientResetMode
-                                  manualClientResetHandler:(nullable RLMSyncErrorReportingBlock)manualClientResetHandler NS_REFINED_FOR_SWIFT;
-
-/**
  Create a flexible sync configuration instance, which can be used to open a Realm that
  supports flexible sync.
- 
- @note A single server-side Device Sync App can sync data with either partition-based realms or flexible sync based realms.
- In order for an application to contain both partition-based and flexible sync realms, more than one
- server-side Device Sync App must be used.
 
- @return A ``RLMRealmConfiguration`` instance with a flexible sync configuration.
+ It won't possible to combine flexible and partition sync in the same app, which means if you open
+ a realm with a flexible sync configuration, you won't be able to open a realm with a PBS configuration
+ and the other way around.
+
+ @return A `RLMRealmConfiguration` instance with a flexible sync configuration.
  */
 - (RLMRealmConfiguration *)flexibleSyncConfiguration NS_REFINED_FOR_SWIFT;
 
 /**
  Create a flexible sync configuration instance, which can be used to open a Realm that
  supports flexible sync.
- 
- @note A single server-side Device Sync App can sync data with either partition-based realms or flexible sync based realms.
- In order for an application to contain both partition-based and flexible sync realms, more than one
- server-side Device Sync App must be used.
- 
- @param clientResetMode Determines file recovery behavior in the event of a client reset.
-                        See: https://docs.mongodb.com/realm/sync/error-handling/client-resets/
- @param beforeResetBlock A callback which notifies prior to a client reset occurring. See: `RLMClientResetBeforeBlock`
- @param afterResetBlock A callback which notifies after a client reset has occurred. See: `RLMClientResetAfterBlock`
- 
- @return A `RLMRealmConfiguration` instance with a flexible sync configuration.
- */
-- (RLMRealmConfiguration *)flexibleSyncConfigurationWithClientResetMode:(RLMClientResetMode)clientResetMode
-                                                      notifyBeforeReset:(nullable RLMClientResetBeforeBlock)beforeResetBlock
-                                                       notifyAfterReset:(nullable RLMClientResetAfterBlock)afterResetBlock NS_REFINED_FOR_SWIFT;
-/**
- Create a flexible sync configuration instance, which can be used to open a Realm that
- supports flexible sync.
 
- @note A single server-side Device Sync App can sync data with either partition-based realms or flexible sync based realms.
- In order for an application to contain both partition-based and flexible sync realms, more than one
- server-side Device Sync App must be used.
-
- @param clientResetMode Determines file recovery behavior in the event of a client reset.
-                        See: https://docs.mongodb.com/realm/sync/error-handling/client-resets/
- @param manualClientResetHandler An error reporting block that is invoked during a client reset.
-                                @See `RLMSyncErrorReportingBlock` and `RLMClientResetInfo`
-
- @return A `RLMRealmConfiguration` instance with a flexible sync configuration.
- */
-- (RLMRealmConfiguration *)flexibleSyncConfigurationWithClientResetMode:(RLMClientResetMode)clientResetMode
-                                               manualClientResetHandler:(nullable RLMSyncErrorReportingBlock)manualClientResetHandler NS_REFINED_FOR_SWIFT;
-
-/**
- Create a flexible sync configuration instance, which can be used to open a Realm that
- supports flexible sync.
-
- @note A single server-side Device Sync App can sync data with either partition-based realms or flexible sync based realms.
- In order for an application to contain both partition-based and flexible sync realms, more than one
- server-side Device Sync App must be used.
+ It won't possible to combine flexible and partition sync in the same app, which means if you open
+ a realm with a flexible sync configuration, you won't be able to open a realm with a PBS configuration
+ and the other way around.
 
  @param initialSubscriptions A block which receives a subscription set instance, that can be
                              used to add an initial set of subscriptions which will be executed
@@ -222,58 +163,6 @@ RLM_SWIFT_SENDABLE RLM_FINAL // internally thread-safe
  */
 - (RLMRealmConfiguration *)flexibleSyncConfigurationWithInitialSubscriptions:(RLMFlexibleSyncInitialSubscriptionsBlock)initialSubscriptions
                                                                  rerunOnOpen:(BOOL)rerunOnOpen NS_REFINED_FOR_SWIFT;
-/**
- Create a flexible sync configuration instance, which can be used to open a Realm that
- supports flexible sync.
-
- @note A single server-side Device Sync App can sync data with either partition-based realms or flexible sync based realms.
- In order for an application to contain both partition-based and flexible sync realms, more than one
- server-side Device Sync App must be used.
-
- @param initialSubscriptions A block which receives a subscription set instance, that can be
-                             used to add an initial set of subscriptions which will be executed
-                             when the Realm is first opened.
- @param rerunOnOpen If true, allows to run the initial set of subscriptions specified, on every app startup.
-                    This can be used to re-run dynamic time ranges and other queries that require a
-                    re-computation of a static variable.
- @param clientResetMode Determines file recovery behavior in the event of a client reset.
-                        See: https://docs.mongodb.com/realm/sync/error-handling/client-resets/
- @param beforeResetBlock A callback which notifies prior to a client reset occurring. See: `RLMClientResetBeforeBlock`
- @param afterResetBlock A callback which notifies after a client reset has occurred. See: `RLMClientResetAfterBlock`
-
- @return A `RLMRealmConfiguration` instance with a flexible sync configuration.
- */
-- (RLMRealmConfiguration *)flexibleSyncConfigurationWithInitialSubscriptions:(RLMFlexibleSyncInitialSubscriptionsBlock)initialSubscriptions
-                                                                 rerunOnOpen:(BOOL)rerunOnOpen
-                                                             clientResetMode:(RLMClientResetMode)clientResetMode
-                                                           notifyBeforeReset:(nullable RLMClientResetBeforeBlock)beforeResetBlock
-                                                            notifyAfterReset:(nullable RLMClientResetAfterBlock)afterResetBlock NS_REFINED_FOR_SWIFT;
-
-/**
- Create a flexible sync configuration instance, which can be used to open a Realm that
- supports flexible sync.
-
- @note A single server-side Device Sync App can sync data with either partition-based realms or flexible sync based realms.
- In order for an application to contain both partition-based and flexible sync realms, more than one
- server-side Device Sync App must be used.
-
- @param initialSubscriptions A block which receives a subscription set instance, that can be
-                             used to add an initial set of subscriptions which will be executed
-                             when the Realm is first opened.
- @param rerunOnOpen If true, allows to run the initial set of subscriptions specified, on every app startup.
-                    This can be used to re-run dynamic time ranges and other queries that require a
-                    re-computation of a static variable.
- @param clientResetMode Determines file recovery behavior in the event of a client reset.
-                        See: https://docs.mongodb.com/realm/sync/error-handling/client-resets/
- @param manualClientResetHandler An error reporting block that is invoked during a client reset.
-                                @See `RLMSyncErrorReportingBlock` and `RLMClientResetInfo`
-
- @return A `RLMRealmConfiguration` instance with a flexible sync configuration.
- */
-- (RLMRealmConfiguration *)flexibleSyncConfigurationWithInitialSubscriptions:(RLMFlexibleSyncInitialSubscriptionsBlock)initialSubscriptions
-                                                                 rerunOnOpen:(BOOL)rerunOnOpen
-                                                             clientResetMode:(RLMClientResetMode)clientResetMode
-                                                    manualClientResetHandler:(nullable RLMSyncErrorReportingBlock)manualClientResetHandler NS_REFINED_FOR_SWIFT;
 
 #pragma mark - Sessions
 
@@ -385,7 +274,6 @@ RLM_SWIFT_SENDABLE RLM_FINAL // internally thread-safe
  Note this is different from a user's unique identifier string.
  @seeAlso `RLMUser.identifier`
  */
-RLM_SWIFT_SENDABLE RLM_FINAL // immutable final class
 @interface RLMUserIdentity : NSObject
 
 /**
@@ -411,7 +299,6 @@ RLM_SWIFT_SENDABLE RLM_FINAL // immutable final class
 /**
  A profile for a given User.
  */
-RLM_SWIFT_SENDABLE RLM_FINAL // immutable final class
 @interface RLMUserProfile : NSObject
 
 /// The full name of the user.
@@ -437,4 +324,4 @@ RLM_SWIFT_SENDABLE RLM_FINAL // immutable final class
 
 @end
 
-RLM_HEADER_AUDIT_END(nullability, sendability)
+NS_ASSUME_NONNULL_END

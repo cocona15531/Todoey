@@ -95,7 +95,10 @@ struct ColKey {
         unsigned val;
     };
 
-    constexpr ColKey() noexcept = default;
+    constexpr ColKey() noexcept
+        : value(null_value)
+    {
+    }
     constexpr explicit ColKey(int64_t val) noexcept
         : value(val)
     {
@@ -161,7 +164,7 @@ struct ColKey {
     {
         return (value >> 30) & 0xFFFFFFFFUL;
     }
-    int64_t value = null_value;
+    int64_t value;
 };
 
 static_assert(ColKey::null_value == 0x7fffffffffffffff, "Fix this");
@@ -251,8 +254,8 @@ public:
 
 struct ObjLink {
 public:
-    constexpr ObjLink() = default;
-    constexpr ObjLink(TableKey table_key, ObjKey obj_key)
+    ObjLink() {}
+    ObjLink(TableKey table_key, ObjKey obj_key)
         : m_obj_key(obj_key)
         , m_table_key(table_key)
     {

@@ -24,7 +24,7 @@ import Realm
 public extension ObjectiveCSupport {
     /// Convert a `SyncConfiguration` to a `RLMSyncConfiguration`.
     static func convert(object: SyncConfiguration) -> RLMSyncConfiguration {
-        return object.config
+        return object.asConfig()
     }
 
     /// Convert a `RLMSyncConfiguration` to a `SyncConfiguration`.

@@ -19,10 +19,9 @@
 #import <Foundation/Foundation.h>
 #import <Realm/RLMObjectId.h>
 
-RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
+NS_ASSUME_NONNULL_BEGIN
 
 /// UserAPIKey model for APIKeys recevied from the server.
-RLM_SWIFT_SENDABLE RLM_FINAL // immutable final class
 @interface RLMUserAPIKey : NSObject
 
 /// Indicates if the API key is disabled or not
@@ -35,9 +34,9 @@ RLM_SWIFT_SENDABLE RLM_FINAL // immutable final class
 /// the response when an API key is first created.
 @property (nonatomic, readonly, nullable) NSString *key;
 
-/// The ObjectId of the API key
-@property (nonatomic, readonly) RLMObjectId *objectId NS_REFINED_FOR_SWIFT;
+/// The ObjectId of the user
+@property (nonatomic, readonly) RLMObjectId *objectId;
 
 @end
 
-RLM_HEADER_AUDIT_END(nullability, sendability)
+NS_ASSUME_NONNULL_END

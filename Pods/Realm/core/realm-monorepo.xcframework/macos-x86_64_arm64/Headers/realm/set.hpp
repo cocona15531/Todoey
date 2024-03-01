@@ -69,7 +69,9 @@ public:
     T get(size_t ndx) const
     {
         const auto current_size = size();
-        CollectionBase::validate_index("get()", ndx, current_size);
+        if (ndx >= current_size) {
+            throw std::out_of_range("Index out of range");
+        }
         return m_tree->get(ndx);
     }
 
@@ -195,8 +197,6 @@ public:
 
         REALM_UNREACHABLE();
     }
-
-    void migrate();
 
 private:
     // Friend because it needs access to `m_tree` in the implementation of
@@ -347,6 +347,7 @@ public:
     std::pair<size_t, bool> erase_any(Mixed value) final;
 
     // Overriding members of ObjList:
+    bool is_obj_valid(size_t) const noexcept final;
     Obj get_object(size_t ndx) const final;
     ObjKey get_key(size_t ndx) const final;
 
@@ -419,8 +420,6 @@ template <>
 void Set<Mixed>::do_erase(size_t);
 template <>
 void Set<Mixed>::do_clear();
-template <>
-void Set<Mixed>::migrate();
 
 /// Compare set elements.
 ///
@@ -467,23 +466,17 @@ struct SetElementLessThan<Mixed> {
         //   the rank is as follows:
         //       boolean
         //       numeric
-        //       string
-        //       binary
+        //       string/binary
         //       Timestamp
         //       ObjectId
         //       UUID
         //       TypedLink
         //       Link
         //
-        // The current Mixed::compare function implements these rules except when comparing
-        // string and binary. If that function is changed we should either implement the rules
-        // here or upgrade all Set<Mixed> columns.
-        if (a.is_type(type_String) && b.is_type(type_Binary)) {
-            return true;
-        }
-        if (a.is_type(type_Binary) && b.is_type(type_String)) {
-            return false;
-        }
+        // The current Mixed::compare_utf8 function implements these rules. If that
+        // function is changed we should either implement the rules here or
+        // upgrade all Set<Mixed> columns.
+
         return a.compare(b) < 0;
     }
 };
@@ -497,12 +490,6 @@ struct SetElementEquals<Mixed> {
 
         // See comments above
 
-        if (a.is_type(type_String) && b.is_type(type_Binary)) {
-            return false;
-        }
-        if (a.is_type(type_Binary) && b.is_type(type_String)) {
-            return false;
-        }
         return a.compare(b) == 0;
     }
 };
@@ -512,7 +499,7 @@ inline Set<T>::Set(const Obj& obj, ColKey col_key)
     : Base(obj, col_key)
 {
     if (!col_key.is_set()) {
-        throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a set");
+        throw LogicError(LogicError::collection_type_mismatch);
     }
 
     check_column_type<value_type>(m_col_key);
@@ -586,11 +573,6 @@ inline LnkSet Obj::get_linkset(ColKey col_key) const
     return LnkSet{*this, col_key};
 }
 
-inline LnkSet Obj::get_linkset(StringData col_name) const
-{
-    return get_linkset(get_column_key(col_name));
-}
-
 inline LnkSetPtr Obj::get_linkset_ptr(ColKey col_key) const
 {
     return std::make_unique<LnkSet>(*this, col_key);
@@ -639,8 +621,7 @@ std::pair<size_t, bool> Set<T>::insert(T value)
     update_if_needed();
 
     if (value_is_null(value) && !m_nullable)
-        throw InvalidArgument(ErrorCodes::PropertyNotNullable,
-                              util::format("Set: %1", CollectionBase::get_property_name()));
+        throw LogicError(LogicError::column_not_nullable);
 
     ensure_created();
     auto it = find_impl(value);
@@ -790,9 +771,6 @@ inline void Set<T>::sort(std::vector<size_t>& indices, bool ascending) const
     auto sz = size();
     set_sorted_indices(sz, indices, ascending);
 }
-
-template <>
-void Set<Mixed>::sort(std::vector<size_t>& indices, bool ascending) const;
 
 template <class T>
 inline void Set<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order) const
@@ -1052,8 +1030,7 @@ inline ObjKey LnkSet::get(size_t ndx) const
 {
     const auto current_size = size();
     if (ndx >= current_size) {
-        throw OutOfBounds(util::format("Invalid index into set: %1", CollectionBase::get_property_name()), ndx,
-                          current_size);
+        throw std::out_of_range("Index out of range");
     }
     return m_set.m_tree->get(virtual2real(ndx));
 }
@@ -1263,18 +1240,19 @@ inline size_t LnkSet::find_any(Mixed value) const
 {
     if (value.is_null())
         return not_found;
+    if (value.get_type() != type_Link)
+        return not_found;
+    size_t found = find(value.get<ObjKey>());
+    if (found != not_found) {
+        found = real2virtual(found);
+    }
+    return found;
+}
 
-    const auto type = value.get_type();
-    if (type == type_Link) {
-        return find(value.get<ObjKey>());
-    }
-    if (type == type_TypedLink) {
-        auto link = value.get_link();
-        if (link.get_table_key() == get_target_table()->get_key()) {
-            return find(link.get_obj_key());
-        }
-    }
-    return not_found;
+inline bool LnkSet::is_obj_valid(size_t) const noexcept
+{
+    // LnkSet cannot contain NULL links.
+    return true;
 }
 
 inline Obj LnkSet::get_object(size_t ndx) const

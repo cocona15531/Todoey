@@ -140,12 +140,10 @@ typedef NS_ENUM(NSUInteger, RLMBSONType) {
 @end
 
 /// MaxKey will always be the greatest value when comparing to other BSON types
-RLM_SWIFT_SENDABLE RLM_FINAL
 @interface RLMMaxKey : NSObject
 @end
 
 /// MinKey will always be the smallest value when comparing to other BSON types
-RLM_SWIFT_SENDABLE RLM_FINAL
 @interface RLMMinKey : NSObject
 @end
 

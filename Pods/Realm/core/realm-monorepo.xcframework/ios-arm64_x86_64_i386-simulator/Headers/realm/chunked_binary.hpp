@@ -77,7 +77,7 @@ private:
     BinaryIterator m_begin;
 };
 
-class ChunkedBinaryInputStream : public util::InputStream {
+class ChunkedBinaryInputStream : public util::NoCopyInputStream {
 public:
     explicit ChunkedBinaryInputStream(const ChunkedBinaryData& chunks)
         : m_it(chunks.iterator())

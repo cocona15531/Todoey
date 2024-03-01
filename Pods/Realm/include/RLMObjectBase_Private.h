@@ -20,7 +20,7 @@
 
 @class RLMArray<RLMObjectType>;
 
-RLM_HEADER_AUDIT_BEGIN(nullability)
+NS_ASSUME_NONNULL_BEGIN
 
 // RLMObjectBase private
 @interface RLMObjectBase ()
@@ -28,7 +28,7 @@ RLM_HEADER_AUDIT_BEGIN(nullability)
 
 + (void)initializeLinkedObjectSchemas;
 + (bool)isEmbedded;
-+ (bool)isAsymmetric;
+
 @end
 
-RLM_HEADER_AUDIT_END(nullability)
+NS_ASSUME_NONNULL_END

@@ -104,7 +104,6 @@ struct RealmConfig {
 
     bool in_memory = false;
     SchemaMode schema_mode = SchemaMode::Automatic;
-    SchemaSubsetMode schema_subset_mode = SchemaSubsetMode::Strict;
 
     // Optional schema for the file.
     // If the schema and schema version are supplied, update_schema() is
@@ -137,6 +136,9 @@ struct RealmConfig {
         return schema_mode == SchemaMode::ReadOnly;
     }
 
+    // The following are intended for internal/testing purposes and
+    // should not be publicly exposed in binding APIs
+
     // If false, always return a new Realm instance, and don't return
     // that Realm instance for other requests for a cached Realm. Useful
     // for dynamic Realms and for tests that need multiple instances on
@@ -147,6 +149,11 @@ struct RealmConfig {
     // format. Used by the browser to warn the user that it'll modify
     // the file.
     bool disable_format_upgrade = false;
+    // Disable the background worker thread for producing change
+    // notifications. Useful for tests for those notifications so that
+    // everything can be done deterministically on one thread, and
+    // speeds up tests that don't need notifications.
+    bool automatic_change_notifications = true;
 
     // The Scheduler which this Realm should be bound to. If not supplied,
     // a default one for the current thread will be used.
@@ -168,19 +175,6 @@ struct RealmConfig {
 
     // Disable automatic backup at file format upgrade by setting to false
     bool backup_at_file_format_change = true;
-
-    // By default converting a top-level table to embedded will fail if there
-    // are any objects without exactly one incoming link. Enabling this makes
-    // it instead delete orphans and duplicate objects with multiple incoming links.
-    bool automatically_handle_backlinks_in_migrations = false;
-
-    // Only for internal testing. Not to be exposed by SDKs.
-    //
-    // Disable the background worker thread for producing change
-    // notifications. Useful for tests for those notifications so that
-    // everything can be done deterministically on one thread, and
-    // speeds up tests that don't need notifications.
-    bool automatic_change_notifications = true;
 };
 
 class Realm : public std::enable_shared_from_this<Realm> {
@@ -205,8 +199,9 @@ public:
 
     std::shared_ptr<SyncSession> sync_session() const;
 
-    // Returns the latest/active subscription set for a FLX-sync enabled realm.
-    // Throws an exception for a non-FLX realm
+    // Returns the latest/active subscription set for a FLX-sync enabled realm. If FLX sync is not currently
+    // enabled for this realm, calling this will cause future connections to the server to be opened in FLX
+    // sync mode if they aren't already.
     sync::SubscriptionSet get_latest_subscription_set();
     sync::SubscriptionSet get_active_subscription_set();
 #endif
@@ -242,6 +237,7 @@ public:
     {
         return m_schema_version;
     }
+
 
     void begin_transaction();
     void commit_transaction();
@@ -324,8 +320,6 @@ public:
     // Get the version of the current read or frozen transaction, or `none` if the Realm
     // is not in a read transaction
     util::Optional<VersionID> current_transaction_version() const;
-    // Get the version of the latest snapshot
-    util::Optional<DB::version_type> latest_snapshot_version() const;
 
     TransactionRef duplicate() const;
 
@@ -398,7 +392,7 @@ public:
         return m_scheduler;
     }
 
-    // Close this Realm. Continuing to use a Realm after closing it will throw Exception(ClosedRealm)
+    // Close this Realm. Continuing to use a Realm after closing it will throw ClosedRealmException
     // Closing a Realm will wait for any asynchronous writes which have been commited but not synced
     // to sync. Asynchronous writes which have not yet started are canceled.
     void close();
@@ -423,9 +417,12 @@ public:
      *
      * @throws PermissionDenied if the operation was not permitted.
      * @throws AccessError for any other error while trying to delete the file or folder.
-     * @throws Exception(DeleteOnOpenRealm) if the function was called on an open Realm.
+     * @throws DeleteOnOpenRealmException if the function was called on an open Realm.
      */
     static void delete_files(const std::string& realm_file_path, bool* did_delete_realm = nullptr);
+
+    // returns the file format version upgraded from if an upgrade took place
+    util::Optional<int> file_format_upgraded_from_version() const;
 
     bool has_pending_async_work() const;
 
@@ -470,11 +467,6 @@ public:
         static void run_writes(Realm& realm)
         {
             realm.run_writes();
-        }
-
-        static void copy_schema(Realm& target_realm, const Realm& source_realm)
-        {
-            target_realm.copy_schema_from(source_realm);
         }
 
         // CollectionNotifier needs to be able to access the owning
@@ -556,7 +548,6 @@ private:
     void cache_new_schema();
     void translate_schema_error();
     void notify_schema_changed();
-    void copy_schema_from(const Realm&);
 
     Transaction& transaction();
     Transaction& transaction() const;
@@ -577,6 +568,110 @@ public:
           MakeSharedTag);
 };
 
+class RealmFileException : public std::runtime_error {
+public:
+    enum class Kind {
+        /** Thrown for any I/O related exception scenarios when a realm is opened. */
+        AccessError,
+        /** Thrown if the history type of the on-disk Realm is unexpected or incompatible. */
+        BadHistoryError,
+        /** Thrown if the user does not have permission to open or create
+         the specified file in the specified access mode when the realm is opened. */
+        PermissionDenied,
+        /** Thrown if create_Always was specified and the file did already exist when the realm is opened. */
+        Exists,
+        /** Thrown if no_create was specified and the file was not found when the realm is opened. */
+        NotFound,
+        /** Thrown if the database file is currently open in another
+         process which cannot share with the current process due to an
+         architecture mismatch. */
+        IncompatibleLockFile,
+        /** Thrown if the file needs to be upgraded to a new format, but upgrades have been explicitly disabled. */
+        FormatUpgradeRequired,
+    };
+    RealmFileException(Kind kind, std::string path, std::string message, std::string underlying)
+        : std::runtime_error(std::move(message))
+        , m_kind(kind)
+        , m_path(std::move(path))
+        , m_underlying(std::move(underlying))
+    {
+    }
+    Kind kind() const
+    {
+        return m_kind;
+    }
+    const std::string& path() const
+    {
+        return m_path;
+    }
+    const std::string& underlying() const
+    {
+        return m_underlying;
+    }
+
+private:
+    Kind m_kind;
+    std::string m_path;
+    std::string m_underlying;
+};
+
+class MismatchedConfigException : public std::logic_error {
+public:
+    MismatchedConfigException(StringData message, StringData path);
+};
+
+class MismatchedRealmException : public std::logic_error {
+public:
+    MismatchedRealmException(StringData message);
+};
+
+class InvalidTransactionException : public std::logic_error {
+public:
+    InvalidTransactionException(std::string message)
+        : std::logic_error(message)
+    {
+    }
+};
+
+class IncorrectThreadException : public std::logic_error {
+public:
+    IncorrectThreadException()
+        : std::logic_error("Realm accessed from incorrect thread.")
+    {
+    }
+};
+
+class ClosedRealmException : public std::logic_error {
+public:
+    ClosedRealmException()
+        : std::logic_error("Cannot access realm that has been closed.")
+    {
+    }
+};
+
+class DeleteOnOpenRealmException : public std::logic_error {
+public:
+    DeleteOnOpenRealmException(const std::string& path)
+        : std::logic_error(util::format("Cannot delete files of an open Realm: '%1' is still in use.", path))
+    {
+    }
+};
+
+class UninitializedRealmException : public std::runtime_error {
+public:
+    UninitializedRealmException(std::string message)
+        : std::runtime_error(message)
+    {
+    }
+};
+
+class InvalidEncryptionKeyException : public std::logic_error {
+public:
+    InvalidEncryptionKeyException()
+        : std::logic_error("Encryption key must be 64 bytes.")
+    {
+    }
+};
 } // namespace realm
 
 #endif /* defined(REALM_REALM_HPP) */

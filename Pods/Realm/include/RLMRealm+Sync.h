@@ -22,7 +22,7 @@
 
 @class RLMResults, RLMSyncSession;
 
-RLM_HEADER_AUDIT_BEGIN(nullability)
+NS_ASSUME_NONNULL_BEGIN
 
 ///
 @interface RLMRealm (Sync)
@@ -35,4 +35,4 @@ RLM_HEADER_AUDIT_BEGIN(nullability)
 
 @end
 
-RLM_HEADER_AUDIT_END(nullability)
+NS_ASSUME_NONNULL_END

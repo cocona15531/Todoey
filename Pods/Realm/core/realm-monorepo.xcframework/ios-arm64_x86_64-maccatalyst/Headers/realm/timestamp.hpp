@@ -64,7 +64,7 @@ public:
     //       +1.1 seconds (1100 milliseconds after the epoch) is constructed by Timestamp(1, 100000000)
     //       -1.1 seconds (1100 milliseconds before the epoch) is constructed by Timestamp(-1, -100000000)
     //
-    constexpr Timestamp(int64_t seconds, int32_t nanoseconds)
+    Timestamp(int64_t seconds, int32_t nanoseconds)
         : m_seconds(seconds)
         , m_nanoseconds(nanoseconds)
         , m_is_null(false)
@@ -74,40 +74,46 @@ public:
         const bool both_non_positive = seconds <= 0 && nanoseconds <= 0;
         REALM_ASSERT_EX(both_non_negative || both_non_positive, both_non_negative, both_non_positive);
     }
-    constexpr Timestamp() = default;
-    constexpr Timestamp(realm::null) {}
-
-    constexpr Timestamp(const Timestamp&) = default;
-    constexpr Timestamp& operator=(const Timestamp&) = default;
+    Timestamp(realm::null)
+        : m_is_null(true)
+    {
+    }
+    Timestamp(const Timestamp&) = default;
 
     template <typename C = std::chrono::system_clock, typename D = typename C::duration>
-    constexpr Timestamp(std::chrono::time_point<C, D> tp)
+    Timestamp(std::chrono::time_point<C, D> tp)
         : m_is_null(false)
     {
         int64_t native_nano = std::chrono::duration_cast<std::chrono::nanoseconds>(tp.time_since_epoch()).count();
         m_seconds = native_nano / nanoseconds_per_second;
         m_nanoseconds = static_cast<int32_t>(native_nano % nanoseconds_per_second);
     }
+    Timestamp()
+        : Timestamp(null{})
+    {
+    }
 
-    constexpr bool is_null() const
+    Timestamp& operator=(const Timestamp& rhs) = default;
+
+    bool is_null() const
     {
         return m_is_null;
     }
 
-    constexpr int64_t get_seconds() const noexcept
+    int64_t get_seconds() const noexcept
     {
         REALM_ASSERT(!m_is_null);
         return m_seconds;
     }
 
-    constexpr int32_t get_nanoseconds() const noexcept
+    int32_t get_nanoseconds() const noexcept
     {
         REALM_ASSERT(!m_is_null);
         return m_nanoseconds;
     }
 
     template <typename C = std::chrono::system_clock, typename D = typename C::duration>
-    constexpr std::chrono::time_point<C, D> get_time_point() const
+    std::chrono::time_point<C, D> get_time_point() const
     {
         REALM_ASSERT(!m_is_null);
 
@@ -118,12 +124,12 @@ public:
     }
 
     template <typename C = std::chrono::system_clock, typename D = typename C::duration>
-    constexpr explicit operator std::chrono::time_point<C, D>() const
+    explicit operator std::chrono::time_point<C, D>() const
     {
         return get_time_point();
     }
 
-    constexpr bool operator==(const Timestamp& rhs) const
+    bool operator==(const Timestamp& rhs) const
     {
         if (is_null() && rhs.is_null())
             return true;
@@ -133,11 +139,11 @@ public:
 
         return m_seconds == rhs.m_seconds && m_nanoseconds == rhs.m_nanoseconds;
     }
-    constexpr bool operator!=(const Timestamp& rhs) const
+    bool operator!=(const Timestamp& rhs) const
     {
         return !(*this == rhs);
     }
-    constexpr bool operator>(const Timestamp& rhs) const
+    bool operator>(const Timestamp& rhs) const
     {
         if (is_null()) {
             return false;
@@ -147,7 +153,7 @@ public:
         }
         return (m_seconds > rhs.m_seconds) || (m_seconds == rhs.m_seconds && m_nanoseconds > rhs.m_nanoseconds);
     }
-    constexpr bool operator<(const Timestamp& rhs) const
+    bool operator<(const Timestamp& rhs) const
     {
         if (rhs.is_null()) {
             return false;
@@ -157,7 +163,7 @@ public:
         }
         return (m_seconds < rhs.m_seconds) || (m_seconds == rhs.m_seconds && m_nanoseconds < rhs.m_nanoseconds);
     }
-    constexpr bool operator<=(const Timestamp& rhs) const
+    bool operator<=(const Timestamp& rhs) const
     {
         if (is_null()) {
             return true;
@@ -167,7 +173,7 @@ public:
         }
         return *this < rhs || *this == rhs;
     }
-    constexpr bool operator>=(const Timestamp& rhs) const
+    bool operator>=(const Timestamp& rhs) const
     {
         if (rhs.is_null()) {
             return true;
@@ -178,19 +184,16 @@ public:
         return *this > rhs || *this == rhs;
     }
 
-    constexpr size_t hash() const noexcept
-    {
-        return size_t(m_seconds) ^ size_t(m_nanoseconds);
-    }
+    size_t hash() const noexcept;
 
     template <class Ch, class Tr>
     friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Timestamp&);
     static constexpr int32_t nanoseconds_per_second = 1000000000;
 
 private:
-    int64_t m_seconds = 0;
-    int32_t m_nanoseconds = 0;
-    bool m_is_null = true;
+    int64_t m_seconds;
+    int32_t m_nanoseconds;
+    bool m_is_null;
 };
 
 // LCOV_EXCL_START
@@ -221,21 +224,26 @@ inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const
 }
 // LCOV_EXCL_STOP
 
+inline size_t Timestamp::hash() const noexcept
+{
+    return size_t(m_seconds) ^ size_t(m_nanoseconds);
+}
+
 } // namespace realm
 
 namespace std {
 template <>
 struct numeric_limits<realm::Timestamp> {
     static constexpr bool is_integer = false;
-    static constexpr realm::Timestamp min()
+    static realm::Timestamp min()
     {
         return realm::Timestamp(numeric_limits<int64_t>::min(), 0);
     }
-    static constexpr realm::Timestamp lowest()
+    static realm::Timestamp lowest()
     {
         return realm::Timestamp(numeric_limits<int64_t>::lowest(), 0);
     }
-    static constexpr realm::Timestamp max()
+    static realm::Timestamp max()
     {
         return realm::Timestamp(numeric_limits<int64_t>::max(), 0);
     }

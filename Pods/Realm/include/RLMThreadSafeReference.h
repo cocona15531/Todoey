@@ -16,11 +16,11 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#import <Realm/RLMConstants.h>
+#import <Foundation/Foundation.h>
 
 @class RLMRealm;
 
-RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
+NS_ASSUME_NONNULL_BEGIN
 
 /**
  Objects of types which conform to `RLMThreadConfined` can be managed by a Realm, which will make
@@ -67,7 +67,6 @@ RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
  @see `RLMThreadConfined`
  @see `-[RLMRealm resolveThreadSafeReference:]`
  */
-RLM_SWIFT_SENDABLE RLM_FINAL // is internally thread-safe
 @interface RLMThreadSafeReference<__covariant Confined : id<RLMThreadConfined>> : NSObject
 
 /**
@@ -104,4 +103,4 @@ RLM_SWIFT_SENDABLE RLM_FINAL // is internally thread-safe
 
 @end
 
-RLM_HEADER_AUDIT_END(nullability, sendability)
+NS_ASSUME_NONNULL_END
