@@ -13,10 +13,8 @@ class CategoryTableViewController: UITableViewController {
     
     let realm = try! Realm()
     
-    var categories = [Category]()
-    
-    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
-
+    var categories: Results<Category>
+     
     override func viewDidLoad() {
         super.viewDidLoad()
         
@@ -67,9 +65,7 @@ class CategoryTableViewController: UITableViewController {
             
             let newCategory = Category()
             newCategory.name = textField.text!
-            
-            self.categories.append(newCategory)
-            
+             
             self.save(category: newCategory)
         }
         
@@ -98,14 +94,10 @@ class CategoryTableViewController: UITableViewController {
     }
     
     func loadCategories() {
-//        
-//        let request: NSFetchRequest<Category> = Category.fetchRequest()
-//        
-//        do {
-//            categories = try context.fetch(request)
-//        } catch {
-//            print("Error fetching data from context \(error)")
-//        }
-//        tableView.reloadData()
+        
+        categories = realm.objects(Category.self)
+
+        
+        tableView.reloadData()
     }
 }
