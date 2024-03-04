@@ -38,12 +38,14 @@ class TodoListViewController: UITableViewController {
         let cell = tableView.dequeueReusableCell(withIdentifier: "ToDoItemCell", for: indexPath)
         
         if let item = todoItems?[indexPath.row] {
+            print("Item: \(item.title)")
             
             cell.textLabel?.text = item.title
             
             cell.accessoryType = item.done ? .checkmark : .none
             
         } else {
+            print("No items")
             cell.textLabel?.text = "No Items Added"
         }
     
@@ -55,8 +57,8 @@ class TodoListViewController: UITableViewController {
         if let item = todoItems?[indexPath.row] {
             do {
                 try realm.write {
-                    realm.delete(item)
-//                    item.done = !item.done
+//                    realm.delete(item)
+                    item.done = !item.done
                 }
             } catch {
                 print("\(error)")
