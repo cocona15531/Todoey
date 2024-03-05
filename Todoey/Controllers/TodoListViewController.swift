@@ -66,13 +66,7 @@ class TodoListViewController: UITableViewController {
         }
         
         tableView.reloadData()
-        
-//        context.delete(itemArray[indexPath.row])
-        //        itemArray.remove(at: indexPath.row)
-        
-        
-//        todoItems?[indexPath.row].done = ((todoItems?[indexPath.row].done) != nil) ? !(todoItems?[indexPath.row].done)! : true
-//                
+                
         tableView.deselectRow(at: indexPath, animated: true)
     }
     
@@ -115,34 +109,10 @@ class TodoListViewController: UITableViewController {
     
     //MARK: - Model Manupulation Methods
     
-//    func saveItems() {
-//        
-//        do {
-//            try context.save()
-//        } catch {
-//            print("\(error)")
-//        }
-//        
-//        self.tableView.reloadData()
-//    }
-    
     func loadItem() {
         
         todoItems = selectedCategory?.items.sorted(byKeyPath: "title", ascending: true)
         
-//        let categoryPredicate = NSPredicate(format: "parentCategory.name MATCHES %@", selectedCategory!.name!)
-//
-//        if let additionalPredicate = predicate {
-//            request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [categoryPredicate, additionalPredicate])
-//        } else {
-//            request.predicate = categoryPredicate
-//        }
-//        
-//        do {
-//            itemArray = try context.fetch(request)
-//        } catch {
-//            print("エラーが発生しました。\(error)")
-//        }
         tableView.reloadData()
     }
 }
