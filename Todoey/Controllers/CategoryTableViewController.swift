@@ -19,7 +19,6 @@ class CategoryTableViewController: SwipeTableViewController {
         super.viewDidLoad()
         
         loadCategories()
-        tableView.rowHeight = 80.0
         
     }
     
@@ -28,7 +27,6 @@ class CategoryTableViewController: SwipeTableViewController {
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         return categories?.count ?? 1
     }
-    
     
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
