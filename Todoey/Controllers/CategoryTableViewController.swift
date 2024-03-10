@@ -21,6 +21,8 @@ class CategoryTableViewController: SwipeTableViewController {
         
         loadCategories()
         
+        tableView.separatorStyle = .none
+        
     }
     
     //MARK: - TableView Datasource Methods
