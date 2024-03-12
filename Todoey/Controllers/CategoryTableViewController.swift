@@ -22,7 +22,6 @@ class CategoryTableViewController: SwipeTableViewController {
         loadCategories()
         
         tableView.separatorStyle = .none
-        
     }
     
     //MARK: - TableView Datasource Methods
@@ -69,6 +68,7 @@ class CategoryTableViewController: SwipeTableViewController {
             
             let newCategory = Category()
             newCategory.name = textField.text!
+            //カテゴリ作成時に色の文字列を取得
             newCategory.color = UIColor.randomFlat().hexValue()
             
             self.save(category: newCategory)
