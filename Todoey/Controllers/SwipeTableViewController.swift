@@ -20,6 +20,7 @@ class SwipeTableViewController: UITableViewController, SwipeTableViewCellDelegat
     //MARK: - TableView Datasource Methods
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        //swipetableviewのカスタムセルで追加
         let cell = tableView.dequeueReusableCell(withIdentifier: "Cell") as! SwipeTableViewCell
         
         cell.delegate = self
