@@ -46,9 +46,14 @@ class TodoListViewController: SwipeTableViewController {
             
             cell.textLabel?.text = item.title
 
-            if let color = FlatSkyBlue().darken(byPercentage: CGFloat(indexPath.row / todoItems!.count)) {
+            if let color = FlatSkyBlue().darken(byPercentage: CGFloat(indexPath.row) / CGFloat(todoItems?.count ?? 1)) {
                 cell.backgroundColor = color
             }
+            
+            //整数同士の計算なので小数点以下の値は0になる
+//            print("version 1:  \(CGFloat(indexPath.row / (todoItems?.count ?? 1)))")
+//            
+//            print("version 2:  \(CGFloat(indexPath.row) / CGFloat(todoItems?.count ?? 1))")
             
 //            if let color = FlatSkyBlue().darken(byPercentage: CGFloat(indexPath.row / todoItems?.count) {
 //             
