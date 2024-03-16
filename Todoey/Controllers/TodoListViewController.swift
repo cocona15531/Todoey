@@ -24,12 +24,18 @@ class TodoListViewController: SwipeTableViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-                
-        //        loadItem()
         
         tableView.separatorStyle = .none
     }
     
+    override func viewWillAppear(_ animated: Bool) {
+        if let colorHex = selectedCategory?.color {
+            
+            guard let navBar = navigationController?.navigationBar.scrollEdgeAppearance else {fatalError("Navigation controller does not exist.")}
+            
+            navBar.backgroundColor = UIColor(hexString: colorHex)
+        }
+    }
     
     //MARK: - TableView Datasource Methods
     
@@ -45,22 +51,22 @@ class TodoListViewController: SwipeTableViewController {
             print("Item: \(item.title)")
             
             cell.textLabel?.text = item.title
-
+            
             if let color = UIColor(hexString: selectedCategory!.color)!.darken(byPercentage: CGFloat(indexPath.row) / CGFloat(todoItems?.count ?? 1)) {
                 cell.backgroundColor = color
-            cell.textLabel?.textColor = ContrastColorOf(color, returnFlat: true)
+                cell.textLabel?.textColor = ContrastColorOf(color, returnFlat: true)
             }
             
             //整数同士の計算なので小数点以下の値は0になる
-//            print("version 1:  \(CGFloat(indexPath.row / (todoItems?.count ?? 1)))")
-//            
-//            print("version 2:  \(CGFloat(indexPath.row) / CGFloat(todoItems?.count ?? 1))")
+            //            print("version 1:  \(CGFloat(indexPath.row / (todoItems?.count ?? 1)))")
+            //
+            //            print("version 2:  \(CGFloat(indexPath.row) / CGFloat(todoItems?.count ?? 1))")
             
-//            if let color = FlatSkyBlue().darken(byPercentage: CGFloat(indexPath.row / todoItems?.count) {
-//             
-//                cell.backgroundColor = color
-//                
-//            }
+            //            if let color = FlatSkyBlue().darken(byPercentage: CGFloat(indexPath.row / todoItems?.count) {
+            //
+            //                cell.backgroundColor = color
+            //
+            //            }
             
             cell.accessoryType = item.done ? .checkmark : .none
             
