@@ -32,7 +32,6 @@
                     </tableView>
                     <navigationItem key="navigationItem" title="Todoey" id="2K9-8g-cd7">
                         <barButtonItem key="rightBarButtonItem" systemItem="add" id="yP3-di-nBX">
-                            <color key="tintColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                             <connections>
                                 <action selector="addButtonPressed:" destination="otN-5M-qYg" id="AcL-Ov-oMv"/>
                             </connections>
@@ -103,6 +102,9 @@
                         <autoresizingMask key="autoresizingMask"/>
                         <color key="barTintColor" systemColor="systemBlueColor"/>
                         <textAttributes key="titleTextAttributes">
+                            <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                        </textAttributes>
+                        <textAttributes key="largeTitleTextAttributes">
                             <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                         </textAttributes>
                         <navigationBarAppearance key="scrollEdgeAppearance">

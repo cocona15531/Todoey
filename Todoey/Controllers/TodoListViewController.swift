@@ -34,38 +34,31 @@ class TodoListViewController: SwipeTableViewController {
             
             title = selectedCategory?.name
             
-            guard let navBar = navigationController?.navigationBar else {fatalError("Navigation controller does not exist.")}
+            guard let navBar = navigationController?.navigationBar else {fatalError("Navigation controller does not exist.")
+            }
             
             if let navBarColor = UIColor(hexString: colorHex) {
                 
                 let navBarAppearance = UINavigationBarAppearance()
                 navBarAppearance.backgroundColor = navBarColor
-                navBar.scrollEdgeAppearance = navBarAppearance
-                navBar.standardAppearance = navBarAppearance
+
                 
                 navBar.backgroundColor = navBarColor
                 
                 navBar.tintColor = ContrastColorOf(navBarColor, returnFlat: true)
                 
+                navBarAppearance.largeTitleTextAttributes = [NSAttributedString.Key.foregroundColor: ContrastColorOf(navBarColor, returnFlat: true)]
+                
                 searchBar.barTintColor = navBarColor
                 
+                navBarAppearance.titleTextAttributes = [NSAttributedString.Key.foregroundColor: ContrastColorOf(navBarColor, returnFlat: true)]
+             
+                navBar.scrollEdgeAppearance = navBarAppearance
+                navBar.standardAppearance = navBarAppearance
             }
             
 
         }
-    }
-    
-    override func viewWillDisappear(_ animated: Bool) {
-        super.viewWillDisappear(animated)
-        
-        // ナビゲーションバーのスタイルをデフォルトまたは他の画面に適したスタイルに戻す
-        let navBarAppearance = UINavigationBarAppearance()
-        navBarAppearance.backgroundColor = .systemBlue // デフォルトの背景色に戻す
-        // ここでその他のナビゲーションバーのスタイルをデフォルトに設定
-
-        guard let navBar = navigationController?.navigationBar else { fatalError("Navigation controller does not exist.") }
-        navBar.standardAppearance = navBarAppearance
-        navBar.scrollEdgeAppearance = navBarAppearance
     }
     
     //MARK: - TableView Datasource Methods
